@@ -36,6 +36,9 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Smriti: cached USDA bulk dataset used only by scripts/build-seed.mjs
+scripts/.cache/
+
 example
 
 # generated native folders

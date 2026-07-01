@@ -4,6 +4,8 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~57.0.1",
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.1",
     "expo-constants": "~57.0.2",
     "expo-device": "~57.0.0",
@@ -25,10 +27,13 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.2",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.10.0"
+    "react-native-worklets": "0.10.0",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~57.0.0",
     "typescript": "~6.0.3"
   },
   "scripts": {

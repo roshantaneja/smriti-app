@@ -1,56 +1,70 @@
-# Welcome to your Expo app 👋
+# Smriti 🌿
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A nutrition tracker built for people who **cook their own food**. Most calorie apps
+are optimized for barcodes and restaurant menus; Smriti is optimized for home cooks —
+log your own recipes and ingredients once, then logging a home-cooked meal is a single tap.
 
-## Get started
+_Smriti_ (स्मृति) means "memory" in Sanskrit: the app remembers your pantry and recipes
+so you don't have to re-enter them.
 
-1. Install dependencies
+## What's here (MVP)
 
-   ```bash
-   npm install
-   ```
+The core daily loop:
 
-2. Start the app
+- **Today** — dashboard of calories, protein/carbs/fat/fiber, and water vs. your goals.
+- **Foods** — an ingredient library seeded with real USDA nutrition data (per 100 g),
+  plus your own foods (manual entry; label/barcode scanning is a planned add-on).
+- **Recipes** — build a recipe from ingredients + amounts; it auto-computes per-serving
+  macros. Rate recipes after cooking; sort by protein density, speed, or rating.
+- **Goals** — set your daily targets.
 
-   ```bash
-   npx expo start
-   ```
+Everything is stored **on-device** (no account, no cloud). That leaves a clean seam to
+add sync + a community recipe layer later.
 
-In the output, you'll find options to open the app in a
+## Run it
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+You'll preview on your phone with **Expo Go** (no Xcode/simulator needed):
 
 ```bash
-npm run reset-project
+npm install          # if node_modules is missing
+npx expo start       # then scan the QR code with Expo Go (iOS/Android)
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+- iOS: install **Expo Go** from the App Store, open the Camera, scan the QR code.
+- Requires a modern Node (built and verified on Node 22–25).
 
-### Other setup steps
+## The nutrition seed data
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+The seed ingredient library is **generated from USDA FoodData Central**, never hand-typed.
+`scripts/build-seed.mjs` downloads USDA's SR Legacy dataset (cached, no API key needed),
+extracts per-100 g nutrients for a curated set of home-cooking staples, and writes
+`assets/data/seed-ingredients.json`.
 
-## Learn more
+To regenerate or expand the list (edit the `FOODS` array in the script first):
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+node scripts/build-seed.mjs
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Project layout
 
-## Join the community
+```
+src/
+  app/                 # expo-router screens (file-based routing)
+    (tabs)/            # Today · Recipes · Foods · Goals
+    log-add.tsx        # add-to-today modal (foods / recipes / quick / water)
+    recipe/            # recipe create + detail
+    food/new.tsx       # manual ingredient entry
+  lib/                 # domain: types, nutrition math, units, store (zustand)
+  components/          # UI kit (Card, Button, Field, Screen, progress, …)
+  constants/theme.ts   # palette + per-macro colors
+scripts/build-seed.mjs # USDA -> seed-ingredients.json
+```
 
-Join our community of developers creating universal apps.
+## Roadmap (post-MVP)
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+1. Barcode + nutrition-label scanning (Open Food Facts / OCR).
+2. Meal planning + auto-generated grocery lists; cost tracking.
+3. Restaurant/chain nutrition via a food API.
+4. Goal-aware AI recommendations that learn from your "didn't like it" feedback.
+5. Community recipe sharing.
