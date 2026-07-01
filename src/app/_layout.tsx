@@ -41,6 +41,18 @@ export default function RootLayout() {
               options={{ presentation: 'modal', headerShown: true, title: 'New ingredient' }}
             />
             <Stack.Screen
+              name="food-search"
+              options={{ presentation: 'modal', headerShown: true, title: 'Search foods' }}
+            />
+            <Stack.Screen
+              name="scan"
+              options={{ presentation: 'modal', headerShown: true, title: 'Scan barcode' }}
+            />
+            <Stack.Screen
+              name="settings"
+              options={{ presentation: 'modal', headerShown: true, title: 'Settings' }}
+            />
+            <Stack.Screen
               name="food/[id]"
               options={{ headerShown: true, title: 'Ingredient' }}
             />

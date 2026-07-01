@@ -1,0 +1,45 @@
+# Build the iOS app on EAS. Requires the EXPO_TOKEN repository secret
+# (create one at https://expo.dev/settings/access-tokens) and, for signed
+# device builds, Apple credentials configured in the Expo project.
+name: EAS iOS build
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'eas.json build profile'
+        type: choice
+        options: [development, preview, production]
+        default: preview
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check EXPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "::error::Missing EXPO_TOKEN secret. Create an access token at https://expo.dev/settings/access-tokens and add it to the repository secrets."
+            exit 1
+          fi
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build iOS
+        # Tag pushes build production; manual runs use the chosen profile.
+        run: eas build --platform ios --profile ${{ github.event.inputs.profile || 'production' }} --non-interactive --no-wait

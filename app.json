@@ -8,7 +8,9 @@
     "scheme": "smriti",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.roshantaneja.smriti",
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
@@ -31,6 +33,12 @@
           "backgroundColor": "#2E7D5B",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Smriti uses the camera to scan food barcodes and look up their nutrition."
         }
       ]
     ],

@@ -47,6 +47,8 @@ export interface Ingredient {
   source: string;
   fdcId?: number;
   fdcDescription?: string;
+  /** GTIN/barcode for products imported from Open Food Facts. */
+  barcode?: string;
   /** Optional cost basis for cost-per-serving math. */
   price?: IngredientPrice;
 }
@@ -117,4 +119,10 @@ export interface Goals {
   fat: number;
   fiber: number;
   waterMl: number;
+}
+
+/** Local app settings. Persisted; holds the free USDA FoodData Central API key. */
+export interface Settings {
+  /** Free key from https://fdc.nal.usda.gov/api-key-signup. Empty until set. */
+  usdaApiKey: string;
 }

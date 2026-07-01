@@ -11,7 +11,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { uid } from "./id";
 import { computeEntryNutrients } from "./nutrition";
 import { SEED_INGREDIENTS } from "./seed";
-import type { Goals, Ingredient, LogEntry, Recipe } from "./types";
+import type { Goals, Ingredient, LogEntry, Recipe, Settings } from "./types";
 import { dayKey } from "./date";
 
 const DEFAULT_GOALS: Goals = {
@@ -21,6 +21,10 @@ const DEFAULT_GOALS: Goals = {
   fat: 65,
   fiber: 30,
   waterMl: 2500,
+};
+
+const DEFAULT_SETTINGS: Settings = {
+  usdaApiKey: "",
 };
 
 interface AppState {
@@ -33,6 +37,7 @@ interface AppState {
   recipes: Recipe[];
   log: LogEntry[];
   goals: Goals;
+  settings: Settings;
 
   // Derived lookups (seed first, then user).
   getIngredient: (id: string) => Ingredient | undefined;
@@ -57,6 +62,10 @@ interface AppState {
   /** Replace all goals at once (used when applying a preset). */
   setPreset: (goals: Goals) => void;
   setHasOnboarded: (value: boolean) => void;
+
+  setUsdaApiKey: (key: string) => void;
+  /** Wipe all user data (ingredients, recipes, log) and reset goals to default. */
+  resetData: () => void;
 }
 
 export const useStore = create<AppState>()(
@@ -69,6 +78,7 @@ export const useStore = create<AppState>()(
       recipes: [],
       log: [],
       goals: DEFAULT_GOALS,
+      settings: DEFAULT_SETTINGS,
 
       getIngredient: (id) =>
         SEED_INGREDIENTS.find((i) => i.id === id) ??
@@ -138,6 +148,11 @@ export const useStore = create<AppState>()(
       setGoals: (patch) => set((s) => ({ goals: { ...s.goals, ...patch } })),
       setPreset: (goals) => set(() => ({ goals })),
       setHasOnboarded: (value) => set(() => ({ hasOnboarded: value })),
+
+      setUsdaApiKey: (key) =>
+        set((s) => ({ settings: { ...s.settings, usdaApiKey: key } })),
+      resetData: () =>
+        set(() => ({ userIngredients: [], recipes: [], log: [], goals: DEFAULT_GOALS })),
     }),
     {
       name: "smriti-store-v1",
@@ -148,6 +163,7 @@ export const useStore = create<AppState>()(
         recipes: s.recipes,
         log: s.log,
         goals: s.goals,
+        settings: s.settings,
       }),
       onRehydrateStorage: () => () => {
         // Runs after persisted state is merged back in.
