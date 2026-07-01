@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -60,5 +60,3 @@ export function Screen({ title, subtitle, right, children, scroll = true, edges 
     </SafeAreaView>
   );
 }
-
-export { RefreshControl };

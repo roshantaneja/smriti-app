@@ -1,7 +1,7 @@
 // Global app state — local-first, persisted to device storage.
 //
-// The seed ingredient library is NOT persisted; it's combined with the user's
-// own ingredients at read time (getAllIngredients). That keeps storage small
+// The seed ingredient library is NOT persisted; getIngredient reads it, and the
+// user's own ingredients are merged in at read time. That keeps storage small
 // and lets seed updates flow through on app upgrades.
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -9,6 +9,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 import { uid } from "./id";
+import { computeEntryNutrients } from "./nutrition";
 import { SEED_INGREDIENTS } from "./seed";
 import type { Goals, Ingredient, LogEntry, Recipe } from "./types";
 import { dayKey } from "./date";
@@ -25,13 +26,15 @@ const DEFAULT_GOALS: Goals = {
 interface AppState {
   _hydrated: boolean;
 
+  /** False until the user finishes (or skips) the first-launch onboarding. */
+  hasOnboarded: boolean;
+
   userIngredients: Ingredient[];
   recipes: Recipe[];
   log: LogEntry[];
   goals: Goals;
 
-  // Derived lookups (combine seed + user).
-  getAllIngredients: () => Ingredient[];
+  // Derived lookups (seed first, then user).
   getIngredient: (id: string) => Ingredient | undefined;
   getRecipe: (id: string) => Recipe | undefined;
 
@@ -51,19 +54,22 @@ interface AppState {
   addWater: (ml: number, date?: string) => void;
 
   setGoals: (patch: Partial<Goals>) => void;
+  /** Replace all goals at once (used when applying a preset). */
+  setPreset: (goals: Goals) => void;
+  setHasOnboarded: (value: boolean) => void;
 }
 
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
       _hydrated: false,
+      hasOnboarded: false,
 
       userIngredients: [],
       recipes: [],
       log: [],
       goals: DEFAULT_GOALS,
 
-      getAllIngredients: () => [...SEED_INGREDIENTS, ...get().userIngredients],
       getIngredient: (id) =>
         SEED_INGREDIENTS.find((i) => i.id === id) ??
         get().userIngredients.find((i) => i.id === id),
@@ -94,10 +100,26 @@ export const useStore = create<AppState>()(
         set((s) => ({ recipes: s.recipes.map((r) => (r.id === id ? { ...r, ...patch } : r)) })),
       deleteRecipe: (id) => set((s) => ({ recipes: s.recipes.filter((r) => r.id !== id) })),
 
-      addLogEntry: (input) =>
+      addLogEntry: (input) => {
+        // Snapshot absolute nutrients + a display label at log time so editing
+        // or deleting the source recipe/ingredient never rewrites history.
+        let { nutrients, label } = input;
+        if (input.kind === "recipe" || input.kind === "ingredient") {
+          const { getIngredient, getRecipe } = get();
+          nutrients = computeEntryNutrients(input, { getIngredient, getRecipe });
+          label =
+            label ??
+            (input.kind === "recipe"
+              ? getRecipe(input.recipeId ?? "")?.name
+              : getIngredient(input.ingredientId ?? "")?.name);
+        }
         set((s) => ({
-          log: [...s.log, { ...input, id: uid("log-"), createdAt: new Date().toISOString() }],
-        })),
+          log: [
+            ...s.log,
+            { ...input, nutrients, label, id: uid("log-"), createdAt: new Date().toISOString() },
+          ],
+        }));
+      },
       deleteLogEntry: (id) => set((s) => ({ log: s.log.filter((e) => e.id !== id) })),
       addWater: (ml, date) =>
         set((s) => ({
@@ -114,11 +136,14 @@ export const useStore = create<AppState>()(
         })),
 
       setGoals: (patch) => set((s) => ({ goals: { ...s.goals, ...patch } })),
+      setPreset: (goals) => set(() => ({ goals })),
+      setHasOnboarded: (value) => set(() => ({ hasOnboarded: value })),
     }),
     {
       name: "smriti-store-v1",
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
+        hasOnboarded: s.hasOnboarded,
         userIngredients: s.userIngredients,
         recipes: s.recipes,
         log: s.log,

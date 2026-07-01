@@ -6,7 +6,9 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
+import { Chip } from '@/components/ui/segmented';
 import { MacroColors, Spacing } from '@/constants/theme';
+import { PRESETS } from '@/lib/presets';
 import { useStore } from '@/lib/store';
 import type { Goals } from '@/lib/types';
 
@@ -23,10 +25,13 @@ export default function GoalsScreen() {
   const goals = useStore((s) => s.goals);
   const setGoals = useStore((s) => s.setGoals);
 
+  const setPreset = useStore((s) => s.setPreset);
+
   const [draft, setDraft] = useState<Record<keyof Goals, string>>(() =>
     Object.fromEntries(FIELDS.map((f) => [f.key, String(goals[f.key])])) as Record<keyof Goals, string>,
   );
   const [saved, setSaved] = useState(false);
+  const [appliedPreset, setAppliedPreset] = useState<string | null>(null);
 
   const num = (k: keyof Goals) => Math.max(0, Math.round(Number(draft[k]) || 0));
   const macroCalories = num('protein') * 4 + num('carbs') * 4 + num('fat') * 9;
@@ -39,8 +44,27 @@ export default function GoalsScreen() {
     setTimeout(() => setSaved(false), 1500);
   };
 
+  const applyPreset = (goalsForPreset: Goals, name: string) => {
+    setDraft(Object.fromEntries(FIELDS.map((f) => [f.key, String(goalsForPreset[f.key])])) as Record<keyof Goals, string>);
+    setPreset(goalsForPreset);
+    setAppliedPreset(name);
+    setTimeout(() => setAppliedPreset(null), 1800);
+  };
+
   return (
     <Screen title="Goals" subtitle="Your daily targets">
+      <Card style={{ gap: Spacing.two }}>
+        <ThemedText type="smallBold">Apply a preset</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {appliedPreset ? `Applied ${appliedPreset} ✓` : 'A starting point you can then fine-tune below.'}
+        </ThemedText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, marginTop: Spacing.one }}>
+          {PRESETS.map((p) => (
+            <Chip key={p.id} label={p.name} onPress={() => applyPreset(p.goals, p.name)} />
+          ))}
+        </View>
+      </Card>
+
       <Card style={{ gap: Spacing.three }}>
         {FIELDS.map((f) => (
           <Field

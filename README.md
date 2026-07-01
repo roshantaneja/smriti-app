@@ -11,12 +11,17 @@ so you don't have to re-enter them.
 
 The core daily loop:
 
-- **Today** — dashboard of calories, protein/carbs/fat/fiber, and water vs. your goals.
+- **Onboarding** — first launch picks a goal preset (Balanced, High-protein, Keto, …) or skips.
+- **Today** — dashboard of calories, protein/carbs/fat/fiber, and water vs. your goals; logged
+  food grouped by Breakfast / Lunch / Dinner / Snacks with per-meal subtotals; collapsible
+  micronutrient totals; water logged separately.
 - **Foods** — an ingredient library seeded with real USDA nutrition data (per 100 g),
-  plus your own foods (manual entry; label/barcode scanning is a planned add-on).
+  plus your own foods (manual entry with optional price). Tap any food for full per-100 g
+  detail including micronutrients.
 - **Recipes** — build a recipe from ingredients + amounts; it auto-computes per-serving
-  macros. Rate recipes after cooking; sort by protein density, speed, or rating.
-- **Goals** — set your daily targets.
+  macros and estimated cost when ingredients carry price data. Rate recipes after cooking;
+  sort by protein density, speed, or rating.
+- **Goals** — set your daily targets or apply a preset.
 
 Everything is stored **on-device** (no account, no cloud). That leaves a clean seam to
 add sync + a community recipe layer later.
@@ -52,10 +57,11 @@ node scripts/build-seed.mjs
 src/
   app/                 # expo-router screens (file-based routing)
     (tabs)/            # Today · Recipes · Foods · Goals
-    log-add.tsx        # add-to-today modal (foods / recipes / quick / water)
+    onboarding.tsx     # first-launch goal preset picker
+    log-add.tsx        # add-to-today modal (foods / recipes / quick / water + meal)
     recipe/            # recipe create + detail
-    food/new.tsx       # manual ingredient entry
-  lib/                 # domain: types, nutrition math, units, store (zustand)
+    food/              # manual ingredient entry + ingredient detail
+  lib/                 # domain: types, nutrition math, presets, units, store (zustand)
   components/          # UI kit (Card, Button, Field, Screen, progress, …)
   constants/theme.ts   # palette + per-macro colors
 scripts/build-seed.mjs # USDA -> seed-ingredients.json
@@ -64,7 +70,7 @@ scripts/build-seed.mjs # USDA -> seed-ingredients.json
 ## Roadmap (post-MVP)
 
 1. Barcode + nutrition-label scanning (Open Food Facts / OCR).
-2. Meal planning + auto-generated grocery lists; cost tracking.
+2. Meal planning + auto-generated grocery lists; weekly grocery cost roll-ups.
 3. Restaurant/chain nutrition via a food API.
 4. Goal-aware AI recommendations that learn from your "didn't like it" feedback.
 5. Community recipe sharing.

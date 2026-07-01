@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
@@ -13,9 +13,16 @@ import { MacroColors, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { dayKey, dayLabel } from '@/lib/date';
 import { entrySubtitle, entryTitle } from '@/lib/format';
-import { resolveEntryNutrients, totalForEntries, totalWater } from '@/lib/nutrition';
+import { MICROS, resolveEntryNutrients, totalForEntries, totalWater } from '@/lib/nutrition';
 import { useStore } from '@/lib/store';
-import type { LogEntry } from '@/lib/types';
+import type { LogEntry, MealType } from '@/lib/types';
+
+const MEAL_ORDER: { meal: MealType; label: string }[] = [
+  { meal: 'breakfast', label: 'Breakfast' },
+  { meal: 'lunch', label: 'Lunch' },
+  { meal: 'dinner', label: 'Dinner' },
+  { meal: 'snack', label: 'Snacks' },
+];
 
 export default function TodayScreen() {
   const theme = useTheme();
@@ -28,12 +35,26 @@ export default function TodayScreen() {
   const addWater = useStore((s) => s.addWater);
   const deleteLogEntry = useStore((s) => s.deleteLogEntry);
 
+  const [microsOpen, setMicrosOpen] = useState(false);
+
   const entries = useMemo(() => log.filter((e) => e.date === today), [log, today]);
   const ctx = useMemo(() => ({ getIngredient, getRecipe }), [getIngredient, getRecipe]);
   const totals = useMemo(() => totalForEntries(entries, ctx), [entries, ctx]);
   const water = useMemo(() => totalWater(entries), [entries]);
 
   const kcal = totals.calories ?? 0;
+
+  const waterEntries = useMemo(() => entries.filter((e) => e.kind === 'water'), [entries]);
+  // Group food entries by meal; legacy/unset entries fall into Snacks.
+  const sections = useMemo(
+    () =>
+      MEAL_ORDER.map((m) => {
+        const items = entries.filter((e) => e.kind !== 'water' && (e.meal ?? 'snack') === m.meal);
+        const kcalSum = items.reduce((acc, e) => acc + (resolveEntryNutrients(e, ctx).calories ?? 0), 0);
+        return { ...m, items, kcal: kcalSum };
+      }).filter((s) => s.items.length > 0),
+    [entries, ctx],
+  );
 
   return (
     <Screen
@@ -71,6 +92,36 @@ export default function TodayScreen() {
         <MacroProgress label="Fiber" value={totals.fiber ?? 0} goal={goals.fiber} unit="g" color={MacroColors.fiber} />
       </Card>
 
+      {/* Micronutrients (collapsible) */}
+      <Card style={{ gap: microsOpen ? Spacing.two : 0 }}>
+        <Pressable
+          onPress={() => setMicrosOpen((v) => !v)}
+          accessibilityRole="button"
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <ThemedText type="smallBold">More nutrients</ThemedText>
+          <Ionicons name={microsOpen ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textSecondary} />
+        </Pressable>
+        {microsOpen ? (
+          <View style={{ gap: Spacing.one }}>
+            {MICROS.map((m) => (
+              <View
+                key={m.key}
+                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {m.label}
+                </ThemedText>
+                <ThemedText type="small">
+                  {Math.round(totals[m.key] ?? 0)} {m.unit}
+                </ThemedText>
+              </View>
+            ))}
+            <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 12, marginTop: Spacing.one }}>
+              Totals across everything logged today. Availability depends on each food&apos;s data.
+            </ThemedText>
+          </View>
+        ) : null}
+      </Card>
+
       {/* Water */}
       <Card style={{ gap: Spacing.two }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -102,22 +153,56 @@ export default function TodayScreen() {
           />
         </Card>
       ) : (
-        <Card style={{ padding: 0, overflow: 'hidden' }}>
-          {entries
-            .slice()
-            .reverse()
-            .map((e, i) => (
-              <LogRow
-                key={e.id}
-                entry={e}
-                kcal={resolveEntryNutrients(e, ctx).calories ?? 0}
-                title={entryTitle(e, ctx)}
-                subtitle={entrySubtitle(e)}
-                onDelete={() => deleteLogEntry(e.id)}
-                first={i === 0}
-              />
-            ))}
-        </Card>
+        <>
+          {sections.map((section) => (
+            <View key={section.meal} style={{ gap: Spacing.two }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <ThemedText type="smallBold">{section.label}</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {Math.round(section.kcal)} kcal
+                </ThemedText>
+              </View>
+              <Card style={{ padding: 0, overflow: 'hidden' }}>
+                {section.items
+                  .slice()
+                  .reverse()
+                  .map((e, i) => (
+                    <LogRow
+                      key={e.id}
+                      entry={e}
+                      kcal={resolveEntryNutrients(e, ctx).calories ?? 0}
+                      title={entryTitle(e, ctx)}
+                      subtitle={entrySubtitle(e)}
+                      onDelete={() => deleteLogEntry(e.id)}
+                      first={i === 0}
+                    />
+                  ))}
+              </Card>
+            </View>
+          ))}
+
+          {waterEntries.length > 0 ? (
+            <View style={{ gap: Spacing.two }}>
+              <ThemedText type="smallBold">Water</ThemedText>
+              <Card style={{ padding: 0, overflow: 'hidden' }}>
+                {waterEntries
+                  .slice()
+                  .reverse()
+                  .map((e, i) => (
+                    <LogRow
+                      key={e.id}
+                      entry={e}
+                      kcal={0}
+                      title={entryTitle(e, ctx)}
+                      subtitle={entrySubtitle(e)}
+                      onDelete={() => deleteLogEntry(e.id)}
+                      first={i === 0}
+                    />
+                  ))}
+              </Card>
+            </View>
+          ) : null}
+        </>
       )}
     </Screen>
   );

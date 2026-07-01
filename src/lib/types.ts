@@ -28,6 +28,14 @@ export interface Portion {
   grams: number;
 }
 
+/** Optional purchase price for an ingredient, used to estimate recipe cost. */
+export interface IngredientPrice {
+  /** What you paid, in your local currency. */
+  amount: number;
+  /** How many grams that amount buys (the price basis). */
+  grams: number;
+}
+
 export interface Ingredient {
   id: string;
   name: string;
@@ -39,6 +47,8 @@ export interface Ingredient {
   source: string;
   fdcId?: number;
   fdcDescription?: string;
+  /** Optional cost basis for cost-per-serving math. */
+  price?: IngredientPrice;
 }
 
 export interface RecipeItem {
@@ -65,6 +75,9 @@ export interface Recipe {
 
 export type LogEntryKind = "recipe" | "ingredient" | "quick" | "water";
 
+/** Which part of the day an entry belongs to. Chosen manually, never inferred. */
+export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
+
 /**
  * A single thing logged on a given day. Kept as a flat, storage-friendly shape;
  * `resolveEntryNutrients` turns any entry into absolute Nutrients.
@@ -74,6 +87,9 @@ export interface LogEntry {
   date: string; // YYYY-MM-DD (local)
   kind: LogEntryKind;
 
+  /** Which meal this belongs to. Optional; legacy/water entries have none. */
+  meal?: MealType;
+
   // kind === "recipe"
   recipeId?: string;
   servings?: number;
@@ -82,7 +98,9 @@ export interface LogEntry {
   ingredientId?: string;
   grams?: number;
 
-  // kind === "quick" (free-form food; nutrients entered directly)
+  // Free-form label + absolute nutrient snapshot.
+  // Always set for "quick"; snapshotted at log time for "recipe"/"ingredient"
+  // too so editing/deleting the source doesn't rewrite history.
   label?: string;
   nutrients?: Nutrients; // absolute total for this entry
 

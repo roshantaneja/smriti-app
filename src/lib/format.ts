@@ -8,9 +8,10 @@ interface Ctx {
 export function entryTitle(e: LogEntry, ctx: Ctx): string {
   switch (e.kind) {
     case 'recipe':
-      return (e.recipeId && ctx.getRecipe(e.recipeId)?.name) || 'Recipe';
+      // Prefer the snapshot label; fall back to the live recipe, then a default.
+      return e.label || (e.recipeId && ctx.getRecipe(e.recipeId)?.name) || 'Recipe';
     case 'ingredient':
-      return (e.ingredientId && ctx.getIngredient(e.ingredientId)?.name) || 'Food';
+      return e.label || (e.ingredientId && ctx.getIngredient(e.ingredientId)?.name) || 'Food';
     case 'quick':
       return e.label || 'Quick add';
     case 'water':

@@ -16,7 +16,7 @@ import { dayKey } from '@/lib/date';
 import { recipePerServing, scale } from '@/lib/nutrition';
 import { SEED_INGREDIENTS } from '@/lib/seed';
 import { useStore } from '@/lib/store';
-import type { Ingredient, NutrientKey } from '@/lib/types';
+import type { Ingredient, MealType, NutrientKey } from '@/lib/types';
 import { defaultUnit, toGrams, unitOptions } from '@/lib/units';
 
 type Mode = 'foods' | 'recipes' | 'quick' | 'water';
@@ -27,20 +27,37 @@ const MODES: { value: Mode; label: string }[] = [
   { value: 'water', label: 'Water' },
 ];
 
+const MEALS: { value: MealType; label: string }[] = [
+  { value: 'breakfast', label: 'Breakfast' },
+  { value: 'lunch', label: 'Lunch' },
+  { value: 'dinner', label: 'Dinner' },
+  { value: 'snack', label: 'Snacks' },
+];
+
 export default function LogAddScreen() {
   const [mode, setMode] = useState<Mode>('foods');
+  // Manually chosen — never inferred from the time of day.
+  const [meal, setMeal] = useState<MealType>('breakfast');
   return (
     <Screen scroll title="Add to today" edges={['bottom']}>
       <Segmented options={MODES} value={mode} onChange={setMode} />
-      {mode === 'foods' && <FoodsMode />}
-      {mode === 'recipes' && <RecipesMode />}
-      {mode === 'quick' && <QuickMode />}
+      {mode !== 'water' ? (
+        <View style={{ gap: Spacing.one }}>
+          <ThemedText type="small" themeColor="textSecondary">
+            Meal
+          </ThemedText>
+          <Segmented options={MEALS} value={meal} onChange={setMeal} />
+        </View>
+      ) : null}
+      {mode === 'foods' && <FoodsMode meal={meal} />}
+      {mode === 'recipes' && <RecipesMode meal={meal} />}
+      {mode === 'quick' && <QuickMode meal={meal} />}
       {mode === 'water' && <WaterMode />}
     </Screen>
   );
 }
 
-function FoodsMode() {
+function FoodsMode({ meal }: { meal: MealType }) {
   const theme = useTheme();
   const userIngredients = useStore((s) => s.userIngredients);
   const addLogEntry = useStore((s) => s.addLogEntry);
@@ -118,7 +135,7 @@ function FoodsMode() {
         <Button
           title="Add to today"
           onPress={() => {
-            addLogEntry({ date: dayKey(), kind: 'ingredient', ingredientId: selected.id, grams });
+            addLogEntry({ date: dayKey(), kind: 'ingredient', meal, ingredientId: selected.id, grams });
             router.back();
           }}
         />
@@ -156,7 +173,7 @@ function FoodsMode() {
   );
 }
 
-function RecipesMode() {
+function RecipesMode({ meal }: { meal: MealType }) {
   const theme = useTheme();
   const recipes = useStore((s) => s.recipes);
   const getIngredient = useStore((s) => s.getIngredient);
@@ -197,7 +214,7 @@ function RecipesMode() {
               size="sm"
               variant="secondary"
               onPress={() => {
-                addLogEntry({ date: dayKey(), kind: 'recipe', recipeId: r.id, servings: 1 });
+                addLogEntry({ date: dayKey(), kind: 'recipe', meal, recipeId: r.id, servings: 1 });
                 router.back();
               }}
             />
@@ -216,7 +233,7 @@ const QUICK_FIELDS: { key: NutrientKey; label: string; unit: string }[] = [
   { key: 'fiber', label: 'Fiber', unit: 'g' },
 ];
 
-function QuickMode() {
+function QuickMode({ meal }: { meal: MealType }) {
   const addLogEntry = useStore((s) => s.addLogEntry);
   const [label, setLabel] = useState('');
   const [vals, setVals] = useState<Record<string, string>>({});
@@ -248,7 +265,7 @@ function QuickMode() {
           const nutrients = Object.fromEntries(
             QUICK_FIELDS.map((f) => [f.key, Number(vals[f.key]) || 0]).filter(([, v]) => (v as number) > 0),
           );
-          addLogEntry({ date: dayKey(), kind: 'quick', label: label.trim(), nutrients });
+          addLogEntry({ date: dayKey(), kind: 'quick', meal, label: label.trim(), nutrients });
           router.back();
         }}
       />

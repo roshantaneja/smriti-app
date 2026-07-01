@@ -11,7 +11,7 @@ import { MacroColors, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { dayKey } from '@/lib/date';
 import { trimNum } from '@/lib/format';
-import { recipePerServing, recipeTotals, scale } from '@/lib/nutrition';
+import { recipeCost, recipePerServing, recipeTotals, scale } from '@/lib/nutrition';
 import { useStore } from '@/lib/store';
 
 export default function RecipeDetailScreen() {
@@ -33,6 +33,10 @@ export default function RecipeDetailScreen() {
   );
   const totals = useMemo(
     () => (recipe ? recipeTotals(recipe, getIngredient) : {}),
+    [recipe, getIngredient],
+  );
+  const cost = useMemo(
+    () => (recipe ? recipeCost(recipe, getIngredient) : null),
     [recipe, getIngredient],
   );
 
@@ -88,6 +92,24 @@ export default function RecipeDetailScreen() {
           <Stat label="fiber" value={`${Math.round(per.fiber ?? 0)}g`} color={MacroColors.fiber} />
         </View>
       </Card>
+
+      {/* Estimated cost (only when at least one ingredient is priced) */}
+      {cost ? (
+        <Card style={{ gap: Spacing.two }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <ThemedText type="smallBold">Cost per serving</ThemedText>
+            <ThemedText type="smallBold" style={{ color: MacroColors.calories }}>
+              ${cost.perServing.toFixed(2)}
+            </ThemedText>
+          </View>
+          <ThemedText type="small" themeColor="textSecondary">
+            ${cost.total.toFixed(2)} total for {recipe.servings} serving{recipe.servings === 1 ? '' : 's'}
+            {cost.pricedItems < cost.totalItems
+              ? ` · estimate from ${cost.pricedItems} of ${cost.totalItems} priced ingredients`
+              : ''}
+          </ThemedText>
+        </Card>
+      ) : null}
 
       {/* Log to today */}
       <Card style={{ gap: Spacing.three }}>

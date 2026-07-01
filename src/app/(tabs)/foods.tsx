@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
@@ -64,7 +64,8 @@ function IngredientRow({ ing, first }: { ing: Ingredient; first: boolean }) {
   const theme = useTheme();
   const p = ing.per100g;
   return (
-    <View
+    <Pressable
+      onPress={() => router.push(`/food/${ing.id}`)}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -87,6 +88,7 @@ function IngredientRow({ ing, first }: { ing: Ingredient; first: boolean }) {
           {p.protein ?? 0}P · {p.carbs ?? 0}C · {p.fat ?? 0}F
         </ThemedText>
       </View>
-    </View>
+      <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+    </Pressable>
   );
 }

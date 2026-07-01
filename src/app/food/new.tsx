@@ -27,6 +27,8 @@ export default function NewIngredientScreen() {
   const [vals, setVals] = useState<Record<string, string>>({});
   const [portionUnit, setPortionUnit] = useState('');
   const [portionGrams, setPortionGrams] = useState('');
+  const [priceAmount, setPriceAmount] = useState('');
+  const [priceGrams, setPriceGrams] = useState('');
 
   const setVal = (k: string, t: string) => setVals((v) => ({ ...v, [k]: t.replace(/[^0-9.]/g, '') }));
   const number = (k: string) => Number(vals[k]) || 0;
@@ -41,12 +43,17 @@ export default function NewIngredientScreen() {
       portionUnit.trim() && Number(portionGrams) > 0
         ? [{ unit: portionUnit.trim(), grams: Number(portionGrams) }]
         : [];
+    const price =
+      Number(priceAmount) > 0 && Number(priceGrams) > 0
+        ? { amount: Number(priceAmount), grams: Number(priceGrams) }
+        : undefined;
     addIngredient({
       name: name.trim(),
       category: category.trim() || 'Custom',
       per100g,
       portions,
       source: 'Manual entry',
+      ...(price ? { price } : {}),
     });
     router.back();
   };
@@ -81,6 +88,17 @@ export default function NewIngredientScreen() {
         <View style={{ flexDirection: 'row', gap: Spacing.three }}>
           <Field label="Unit" placeholder="cup" value={portionUnit} onChangeText={setPortionUnit} />
           <Field label="Grams" suffix="g" keyboardType="decimal-pad" value={portionGrams} onChangeText={(t) => setPortionGrams(t.replace(/[^0-9.]/g, ''))} placeholder="0" />
+        </View>
+      </Card>
+
+      <ThemedText type="smallBold">Price (optional)</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        What you paid and for how many grams — powers cost-per-serving on recipes (e.g. $3.50 per 500 g).
+      </ThemedText>
+      <Card>
+        <View style={{ flexDirection: 'row', gap: Spacing.three }}>
+          <Field label="Price" suffix="$" keyboardType="decimal-pad" value={priceAmount} onChangeText={(t) => setPriceAmount(t.replace(/[^0-9.]/g, ''))} placeholder="0.00" />
+          <Field label="For" suffix="g" keyboardType="decimal-pad" value={priceGrams} onChangeText={(t) => setPriceGrams(t.replace(/[^0-9.]/g, ''))} placeholder="0" />
         </View>
       </Card>
 

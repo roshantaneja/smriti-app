@@ -13,6 +13,17 @@ const ALL_KEYS: NutrientKey[] = [
   "saturatedFat", "sodium", "calcium", "iron", "vitaminC", "vitaminD", "potassium",
 ];
 
+/** Micronutrients surfaced in the UI (beyond the four headline macros + fiber). */
+export const MICROS: { key: NutrientKey; label: string; unit: string }[] = [
+  { key: "sugar", label: "Sugar", unit: "g" },
+  { key: "saturatedFat", label: "Saturated fat", unit: "g" },
+  { key: "sodium", label: "Sodium", unit: "mg" },
+  { key: "calcium", label: "Calcium", unit: "mg" },
+  { key: "iron", label: "Iron", unit: "mg" },
+  { key: "potassium", label: "Potassium", unit: "mg" },
+  { key: "vitaminC", label: "Vitamin C", unit: "mg" },
+];
+
 const round = (v: number, p = 1) => {
   const m = Math.pow(10, p);
   return Math.round(v * m) / m;
@@ -70,9 +81,13 @@ export function recipePerServing(
   return out;
 }
 
-/** Resolve any log entry (recipe / ingredient / quick / water) to absolute nutrients. */
-export function resolveEntryNutrients(
-  entry: LogEntry,
+/**
+ * Compute a log entry's absolute nutrients *live* from its soft references
+ * (recipe/ingredient). Used at log time to snapshot the entry, and as the
+ * fallback for old entries that predate snapshots.
+ */
+export function computeEntryNutrients(
+  entry: Pick<LogEntry, "kind" | "recipeId" | "servings" | "ingredientId" | "grams" | "nutrients">,
   ctx: {
     getIngredient: (id: string) => Ingredient | undefined;
     getRecipe: (id: string) => Recipe | undefined;
@@ -95,6 +110,23 @@ export function resolveEntryNutrients(
     case "water":
       return {};
   }
+}
+
+/**
+ * Resolve any log entry to absolute nutrients. Prefers the snapshot stored at
+ * log time (`entry.nutrients`) so history is stable; falls back to live
+ * computation for entries logged before snapshots existed.
+ */
+export function resolveEntryNutrients(
+  entry: LogEntry,
+  ctx: {
+    getIngredient: (id: string) => Ingredient | undefined;
+    getRecipe: (id: string) => Recipe | undefined;
+  },
+): Nutrients {
+  if (entry.kind === "water") return {};
+  if (entry.nutrients) return entry.nutrients;
+  return computeEntryNutrients(entry, ctx);
 }
 
 function scaleNutrientsBy(n: Nutrients, factor: number): Nutrients {
@@ -120,4 +152,45 @@ export function totalForEntries(
 /** Total water (ml) logged across entries. */
 export function totalWater(entries: LogEntry[]): number {
   return entries.reduce((acc, e) => acc + (e.kind === "water" ? e.waterMl ?? 0 : 0), 0);
+}
+
+/** Estimated cost of a recipe from the priced portion of its ingredients. */
+export interface RecipeCost {
+  /** Total estimated cost across all servings (priced ingredients only). */
+  total: number;
+  /** Estimated cost per serving. */
+  perServing: number;
+  /** How many recipe items carried price data. */
+  pricedItems: number;
+  /** Total recipe items (so the UI can flag partial coverage). */
+  totalItems: number;
+}
+
+/**
+ * Estimate recipe cost from ingredient price data. Returns `null` when no
+ * ingredient in the recipe has a price. Only priced ingredients contribute, so
+ * `pricedItems < totalItems` means the estimate is a lower bound.
+ */
+export function recipeCost(
+  recipe: Recipe,
+  getIngredient: (id: string) => Ingredient | undefined,
+): RecipeCost | null {
+  let total = 0;
+  let pricedItems = 0;
+  for (const it of recipe.items) {
+    const ing = getIngredient(it.ingredientId);
+    const price = ing?.price;
+    if (price && price.grams > 0 && price.amount > 0) {
+      total += (it.grams / price.grams) * price.amount;
+      pricedItems += 1;
+    }
+  }
+  if (pricedItems === 0) return null;
+  const servings = recipe.servings > 0 ? recipe.servings : 1;
+  return {
+    total: round(total, 2),
+    perServing: round(total / servings, 2),
+    pricedItems,
+    totalItems: recipe.items.length,
+  };
 }
