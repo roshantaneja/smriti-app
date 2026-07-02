@@ -129,7 +129,8 @@ export function resolveEntryNutrients(
   return computeEntryNutrients(entry, ctx);
 }
 
-function scaleNutrientsBy(n: Nutrients, factor: number): Nutrients {
+/** Scale an absolute nutrient profile by a plain factor (e.g. portion edits). */
+export function scaleNutrientsBy(n: Nutrients, factor: number): Nutrients {
   const out: Nutrients = {};
   for (const key of ALL_KEYS) {
     const v = n[key];

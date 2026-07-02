@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty';
 import { Bar, MacroProgress } from '@/components/ui/progress';
+import { Ring } from '@/components/ui/ring';
 import { MacroColors, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { dayKey, dayLabel } from '@/lib/date';
@@ -86,9 +87,18 @@ export default function TodayScreen() {
 
       {/* Macros */}
       <Card style={{ gap: Spacing.three }}>
-        <MacroProgress label="Protein" value={totals.protein ?? 0} goal={goals.protein} unit="g" color={MacroColors.protein} />
-        <MacroProgress label="Carbs" value={totals.carbs ?? 0} goal={goals.carbs} unit="g" color={MacroColors.carbs} />
-        <MacroProgress label="Fat" value={totals.fat ?? 0} goal={goals.fat} unit="g" color={MacroColors.fat} />
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            rowGap: Spacing.three,
+          }}>
+          <Ring label="Calories" value={kcal} goal={goals.calories} unit="kcal" color={MacroColors.calories} size={64} />
+          <Ring label="Protein" value={totals.protein ?? 0} goal={goals.protein} unit="g" color={MacroColors.protein} size={64} />
+          <Ring label="Carbs" value={totals.carbs ?? 0} goal={goals.carbs} unit="g" color={MacroColors.carbs} size={64} />
+          <Ring label="Fat" value={totals.fat ?? 0} goal={goals.fat} unit="g" color={MacroColors.fat} size={64} />
+        </View>
         <MacroProgress label="Fiber" value={totals.fiber ?? 0} goal={goals.fiber} unit="g" color={MacroColors.fiber} />
       </Card>
 

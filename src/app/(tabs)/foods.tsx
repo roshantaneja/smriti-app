@@ -32,8 +32,35 @@ export default function FoodsScreen() {
     <Screen
       title="Foods"
       subtitle={`${all.length} ingredients · macros per 100 g`}
-      right={<Button title="+ New" size="sm" onPress={() => router.push('/food/new')} />}>
+      right={
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
+          <Pressable
+            onPress={() => router.push('/settings')}
+            hitSlop={8}
+            accessibilityLabel="Settings">
+            <Ionicons name="settings-outline" size={22} color={theme.textSecondary} />
+          </Pressable>
+          <Button title="+ New" size="sm" onPress={() => router.push('/food/new')} />
+        </View>
+      }>
       <Field placeholder="Search foods…" value={q} onChangeText={setQ} autoCorrect={false} />
+
+      <View style={{ flexDirection: 'row', gap: Spacing.three }}>
+        <Button
+          title="Scan barcode"
+          size="sm"
+          variant="secondary"
+          onPress={() => router.push('/scan')}
+          style={{ flex: 1 }}
+        />
+        <Button
+          title="Search online"
+          size="sm"
+          variant="secondary"
+          onPress={() => router.push('/food-search')}
+          style={{ flex: 1 }}
+        />
+      </View>
 
       {filtered.length === 0 ? (
         <Card>

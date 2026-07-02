@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { Screen } from '@/components/screen';
@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
 import { Spacing } from '@/constants/theme';
 import { useStore } from '@/lib/store';
-import type { NutrientKey } from '@/lib/types';
+import type { Ingredient, Nutrients, NutrientKey } from '@/lib/types';
 
 const MACROS: { key: NutrientKey; label: string; unit: string }[] = [
   { key: 'calories', label: 'Calories', unit: 'kcal' },
@@ -19,14 +19,41 @@ const MACROS: { key: NutrientKey; label: string; unit: string }[] = [
   { key: 'fiber', label: 'Fiber', unit: 'g' },
 ];
 
+type Draft = Omit<Ingredient, 'id'>;
+
+/** Seed the visible macro inputs from a prefilled per-100 g profile. */
+function macroStrings(per100g: Nutrients): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const m of MACROS) {
+    const v = per100g[m.key];
+    if (typeof v === 'number') out[m.key] = String(v);
+  }
+  return out;
+}
+
 export default function NewIngredientScreen() {
   const addIngredient = useStore((s) => s.addIngredient);
 
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
-  const [vals, setVals] = useState<Record<string, string>>({});
-  const [portionUnit, setPortionUnit] = useState('');
-  const [portionGrams, setPortionGrams] = useState('');
+  // Optional prefill from a barcode scan or an online search (JSON-encoded draft).
+  const { prefill } = useLocalSearchParams<{ prefill?: string }>();
+  const draft = useMemo<Draft | null>(() => {
+    if (!prefill) return null;
+    try {
+      return JSON.parse(prefill) as Draft;
+    } catch {
+      return null;
+    }
+  }, [prefill]);
+
+  const [name, setName] = useState(draft?.name ?? '');
+  const [category, setCategory] = useState(draft?.category ?? '');
+  const [vals, setVals] = useState<Record<string, string>>(() =>
+    draft ? macroStrings(draft.per100g) : {},
+  );
+  const [portionUnit, setPortionUnit] = useState(draft?.portions?.[0]?.unit ?? '');
+  const [portionGrams, setPortionGrams] = useState(
+    draft?.portions?.[0] ? String(draft.portions[0].grams) : '',
+  );
   const [priceAmount, setPriceAmount] = useState('');
   const [priceGrams, setPriceGrams] = useState('');
 
@@ -36,9 +63,14 @@ export default function NewIngredientScreen() {
 
   const onSave = () => {
     if (!canSave) return;
-    const per100g = Object.fromEntries(
-      MACROS.map((m) => [m.key, number(m.key)]).filter(([, v]) => (v as number) > 0),
-    );
+    // Start from any imported micronutrients the form doesn't surface, then let
+    // the visible macro fields win so hand edits always take effect.
+    const per100g: Nutrients = { ...(draft?.per100g ?? {}) };
+    for (const m of MACROS) {
+      const v = number(m.key);
+      if (v > 0) per100g[m.key] = v;
+      else delete per100g[m.key];
+    }
     const portions =
       portionUnit.trim() && Number(portionGrams) > 0
         ? [{ unit: portionUnit.trim(), grams: Number(portionGrams) }]
@@ -52,14 +84,21 @@ export default function NewIngredientScreen() {
       category: category.trim() || 'Custom',
       per100g,
       portions,
-      source: 'Manual entry',
+      source: draft?.source ?? 'Manual entry',
+      ...(draft?.barcode ? { barcode: draft.barcode } : {}),
+      ...(draft?.fdcId ? { fdcId: draft.fdcId } : {}),
+      ...(draft?.fdcDescription ? { fdcDescription: draft.fdcDescription } : {}),
       ...(price ? { price } : {}),
     });
     router.back();
   };
 
   return (
-    <Screen scroll title="New ingredient" subtitle="Nutrition per 100 g" edges={['bottom']}>
+    <Screen
+      scroll
+      title="New ingredient"
+      subtitle={draft ? `Imported from ${draft.source} · per 100 g` : 'Nutrition per 100 g'}
+      edges={['bottom']}>
       <Card style={{ gap: Spacing.three }}>
         <Field label="Name" placeholder="e.g. Skinny Pop popcorn" value={name} onChangeText={setName} />
         <Field label="Category (optional)" placeholder="Snacks" value={category} onChangeText={setCategory} />

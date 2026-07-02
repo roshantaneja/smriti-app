@@ -1,0 +1,42 @@
+# Quality gate: types, lint, unit tests, and an iOS bundle smoke-check.
+# Mirrors the local gate (`npx tsc --noEmit` + `npx expo lint` + `npm test`).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        # --legacy-peer-deps: jest-expo@57 peers on @react-native/jest-preset ^0.85
+        # while react-native 0.86 optionally peers on 0.86 — a known SDK 57 skew.
+        run: npm ci --legacy-peer-deps
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx expo lint
+
+      - name: Unit tests
+        run: npm test -- --ci
+
+      - name: iOS bundle smoke-check
+        run: npx expo export -p ios
+        env:
+          EXPO_NO_TELEMETRY: '1'

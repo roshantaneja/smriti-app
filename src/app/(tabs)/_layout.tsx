@@ -25,6 +25,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="plan"
+        options={{
+          title: 'Plan',
+          tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
         name="recipes"
         options={{
           title: 'Recipes',
@@ -39,10 +46,10 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="goals"
+        name="trends"
         options={{
-          title: 'Goals',
-          tabBarIcon: ({ color, size }) => <Ionicons name="options-outline" color={color} size={size} />,
+          title: 'Trends',
+          tabBarIcon: ({ color, size }) => <Ionicons name="trending-up-outline" color={color} size={size} />,
         }}
       />
     </Tabs>
