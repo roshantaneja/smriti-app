@@ -112,6 +112,48 @@ export interface LogEntry {
   createdAt: string;
 }
 
+/** One line of a saved meal — the same soft references a LogEntry carries. */
+export interface SavedMealItem {
+  kind: "ingredient" | "recipe" | "quick";
+  ingredientId?: string;
+  grams?: number;
+  recipeId?: string;
+  servings?: number;
+  /** For "quick" items: the label + absolute nutrients logged as-is. */
+  label?: string;
+  nutrients?: Nutrients;
+}
+
+/** Foods eaten together, loggable in one tap (a template, not a recipe). */
+export interface SavedMeal {
+  id: string;
+  name: string;
+  items: SavedMealItem[];
+  createdAt: string;
+}
+
+/** One planned slot on the weekly meal plan. */
+export interface PlanEntry {
+  id: string;
+  date: string; // YYYY-MM-DD (local)
+  meal: MealType;
+  kind: "recipe" | "ingredient";
+  recipeId?: string;
+  servings?: number;
+  ingredientId?: string;
+  grams?: number;
+  /** Leftover portion of an earlier cook — excluded from grocery aggregation. */
+  leftover?: boolean;
+}
+
+/** A single weigh-in. Weight is stored in kilograms. */
+export interface WeightEntry {
+  id: string;
+  date: string; // YYYY-MM-DD (local)
+  kg: number;
+  createdAt: string;
+}
+
 export interface Goals {
   calories: number;
   protein: number;

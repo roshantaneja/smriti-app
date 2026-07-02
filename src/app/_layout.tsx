@@ -53,6 +53,14 @@ export default function RootLayout() {
               options={{ presentation: 'modal', headerShown: true, title: 'Settings' }}
             />
             <Stack.Screen
+              name="goals"
+              options={{ headerShown: true, title: 'Goals' }}
+            />
+            <Stack.Screen
+              name="grocery"
+              options={{ headerShown: true, title: 'Grocery list' }}
+            />
+            <Stack.Screen
               name="food/[id]"
               options={{ headerShown: true, title: 'Ingredient' }}
             />

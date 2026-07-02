@@ -8,10 +8,10 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty';
-import { Segmented } from '@/components/ui/segmented';
+import { Chip, Segmented } from '@/components/ui/segmented';
 import { MacroColors, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { recipePerServing } from '@/lib/nutrition';
+import { recipeCost, recipePerServing } from '@/lib/nutrition';
 import { useStore } from '@/lib/store';
 import type { Recipe } from '@/lib/types';
 
@@ -26,14 +26,32 @@ const SORTS: { value: SortKey; label: string }[] = [
 
 export default function RecipesScreen() {
   const [sort, setSort] = useState<SortKey>('recent');
+  const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [highProtein, setHighProtein] = useState(false);
+  const [pricedOnly, setPricedOnly] = useState(false);
   const recipes = useStore((s) => s.recipes);
   const getIngredient = useStore((s) => s.getIngredient);
 
+  const allTags = useMemo(
+    () => [...new Set(recipes.flatMap((r) => r.tags))].sort((a, b) => a.localeCompare(b)),
+    [recipes],
+  );
+  const toggleTag = (tag: string) =>
+    setActiveTags((tags) => (tags.includes(tag) ? tags.filter((t) => t !== tag) : [...tags, tag]));
+
   const rows = useMemo(() => {
-    const withMacros = recipes.map((r) => ({
-      recipe: r,
-      per: recipePerServing(r, getIngredient),
-    }));
+    // Filters compose (AND), then the chosen sort orders what's left.
+    const withMacros = recipes
+      .map((r) => ({
+        recipe: r,
+        per: recipePerServing(r, getIngredient),
+      }))
+      .filter(({ recipe, per }) => {
+        if (activeTags.length && !activeTags.every((t) => recipe.tags.includes(t))) return false;
+        if (highProtein && (per.protein ?? 0) < 30) return false;
+        if (pricedOnly && recipeCost(recipe, getIngredient) === null) return false;
+        return true;
+      });
     const proteinDensity = (m: { per: { protein?: number; calories?: number } }) =>
       (m.per.calories ?? 0) > 0 ? (m.per.protein ?? 0) / (m.per.calories ?? 1) : 0;
     switch (sort) {
@@ -48,7 +66,7 @@ export default function RecipesScreen() {
       default:
         return withMacros.sort((a, b) => b.recipe.createdAt.localeCompare(a.recipe.createdAt));
     }
-  }, [recipes, getIngredient, sort]);
+  }, [recipes, getIngredient, sort, activeTags, highProtein, pricedOnly]);
 
   return (
     <Screen
@@ -67,9 +85,26 @@ export default function RecipesScreen() {
       ) : (
         <>
           <Segmented options={SORTS} value={sort} onChange={setSort} />
-          {rows.map(({ recipe, per }) => (
-            <RecipeCard key={recipe.id} recipe={recipe} perCalories={per.calories ?? 0} perProtein={per.protein ?? 0} />
-          ))}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
+            <Chip label="≥30g protein" active={highProtein} onPress={() => setHighProtein((v) => !v)} />
+            <Chip label="Priced only" active={pricedOnly} onPress={() => setPricedOnly((v) => !v)} />
+            {allTags.map((t) => (
+              <Chip key={t} label={t} active={activeTags.includes(t)} onPress={() => toggleTag(t)} />
+            ))}
+          </View>
+          {rows.length === 0 ? (
+            <Card>
+              <EmptyState
+                icon="funnel-outline"
+                title="No recipes match"
+                message="Clear a filter or two to see more of your library."
+              />
+            </Card>
+          ) : (
+            rows.map(({ recipe, per }) => (
+              <RecipeCard key={recipe.id} recipe={recipe} perCalories={per.calories ?? 0} perProtein={per.protein ?? 0} />
+            ))
+          )}
         </>
       )}
     </Screen>

@@ -25,8 +25,12 @@ The core daily loop:
 - **Settings** — USDA API key, plus a "reset all data" escape hatch.
 - **Recipes** — build a recipe from ingredients + amounts; it auto-computes per-serving
   macros and estimated cost when ingredients carry price data. Rate recipes after cooking;
-  sort by protein density, speed, or rating.
-- **Goals** — set your daily targets or apply a preset.
+  sort by protein density, speed, or rating; filter by tags, protein, or priced-only; scale
+  the batch, duplicate a recipe, or send it straight to the weekly plan.
+- **Plan** — assign recipes/foods to the week's meals, see per-day macro totals, log a
+  planned meal in one tap, and generate a **grocery list** (ingredients aggregated across the
+  week, with estimated cost where ingredients carry prices).
+- **Goals** — set your daily targets or apply a preset (under Settings → Goals).
 
 Everything is stored **on-device** (no account, no cloud). Barcode scanning and online food
 search are the only two features that touch the network (Open Food Facts and USDA FoodData
@@ -81,15 +85,17 @@ Tests live under `src/lib/__tests__/*.test.ts`.
 ```
 src/
   app/                 # expo-router screens (file-based routing)
-    (tabs)/            # Today · Recipes · Foods · Goals
+    (tabs)/            # Today · Plan · Recipes · Foods · Trends
     onboarding.tsx     # first-launch goal preset picker
     log-add.tsx        # add-to-today modal (foods / recipes / quick / water + meal)
     scan.tsx           # barcode scanner modal (expo-camera -> Open Food Facts)
     food-search.tsx    # live USDA FoodData Central search modal
-    settings.tsx       # settings modal (USDA API key, reset data)
+    settings.tsx       # settings modal (goals link, USDA API key, reset data)
+    goals.tsx          # daily targets + presets (reached from Settings)
+    grocery.tsx        # weekly grocery checklist generated from the plan
     recipe/            # recipe create + detail
     food/              # manual ingredient entry + ingredient detail
-  lib/                 # domain: types, nutrition math, presets, units, import mappers, store (zustand)
+  lib/                 # domain: types, nutrition math, grocery/week math, presets, units, import mappers, store (zustand)
   services/            # network clients: Open Food Facts + USDA FoodData Central
   components/          # UI kit (Card, Button, Field, Screen, progress, ring, …)
   constants/theme.ts   # palette + per-macro colors
@@ -99,7 +105,9 @@ scripts/build-seed.mjs # USDA -> seed-ingredients.json
 ## Roadmap (post-MVP)
 
 1. Nutrition-label scanning (OCR) — barcode scanning via Open Food Facts has shipped.
-2. Meal planning + auto-generated grocery lists; weekly grocery cost roll-ups.
+2. Trends & analytics (charts, averages, history calendar, weight trend, CSV export) and
+   logging accelerators (recents/frequents, saved meals, copy day) — in progress; the Trends
+   tab is currently a placeholder. Meal planning + grocery lists have shipped.
 3. Restaurant/chain nutrition via a food API.
 4. Goal-aware AI recommendations that learn from your "didn't like it" feedback.
 5. Community recipe sharing.

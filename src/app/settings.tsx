@@ -44,6 +44,15 @@ export default function SettingsScreen() {
 
   return (
     <Screen scroll title="Settings" edges={['bottom']}>
+      <ThemedText type="smallBold">Daily goals</ThemedText>
+      <Card>
+        <Button
+          title="Edit goals & presets"
+          variant="secondary"
+          onPress={() => router.push('/goals')}
+        />
+      </Card>
+
       <ThemedText type="smallBold">USDA API key</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
         Powers online food search against USDA FoodData Central. Grab a free key at

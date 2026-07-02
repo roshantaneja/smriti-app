@@ -9,21 +9,27 @@ This project uses **standard `expo-router` `Tabs`** (not the template's `unstabl
 ## Architecture
 - **Routing:** file-based via `expo-router` under `src/app`. Path alias `@/*` → `src/*`, `@/assets/*` → `assets/*`.
  Root `_layout.tsx` is a Stack (tabs group + modal routes `log-add` / `food/new` / `recipe/new` /
- `scan` / `settings` / `food-search` + `food/[id]` / `recipe/[id]` detail); it gates a
+ `scan` / `settings` / `food-search` + `food/[id]` / `recipe/[id]` / `goals` / `grocery`); it gates a
  first-launch `onboarding.tsx` behind `Stack.Protected` on the persisted `hasOnboarded` flag (only after
- the store hydrates). `(tabs)/_layout.tsx` is the 4-tab bar.
+ the store hydrates). `(tabs)/_layout.tsx` is the 5-tab bar (Today / Plan / Recipes / Foods / Trends);
+ Goals moved out of the tab bar to a stack screen reached from Settings.
 - **State:** single zustand store in `src/lib/store.ts`, persisted to AsyncStorage. Local-first, single user.
  The USDA seed library is **not** persisted — it's combined with user ingredients at read time
  (`getIngredient`, plus the inline seed+user merge in the Foods/Recipe screens). Persisted keys:
- `hasOnboarded`, `userIngredients`, `recipes`, `log`, `goals`, `settings`. The `settings` slice
- (`Settings { usdaApiKey }`) is edited via `setUsdaApiKey`; `resetData` clears
- `userIngredients`/`recipes`/`log` and resets `goals` but keeps `settings` + `hasOnboarded`.
+ `hasOnboarded`, `userIngredients`, `recipes`, `log`, `goals`, `settings`, `savedMeals`, `plan`,
+ `weights`, `notes`, `groceryChecked`. The `settings` slice
+ (`Settings { usdaApiKey }`) is edited via `setUsdaApiKey`; `resetData` clears everything except
+ `settings` + `hasOnboarded` and resets `goals`.
  New store fields are optional-with-defaults
  (no hard migration of old `smriti-store-v1` data). `addLogEntry` snapshots absolute `nutrients` + a
  display `label` at log time (for recipe/ingredient too), so `resolveEntryNutrients` prefers the stored
  snapshot and only falls back to live computation for pre-snapshot entries.
 - **Nutrition math:** all in `src/lib/nutrition.ts`. Canonical unit is **grams**; ingredients store
   nutrients **per 100 g**; household units (cup, egg…) are conversions in `src/lib/units.ts`.
+- **Meal planning:** `src/lib/grocery.ts` (pure, tested) owns week math (Monday-start), grocery
+  aggregation from the weekly `plan` (leftover entries excluded), cost totals from ingredient
+  prices, and the `groceryChecked` key format (`${weekStart}:${ingredientId}`). Screens:
+  `(tabs)/plan.tsx` + `grocery.tsx`. The Trends tab is a placeholder (analytics wave deferred).
 - **External food import (the only two network features — everything else is offline):**
   `src/services/openFoodFacts.ts` (`fetchProduct`) backs the `scan` barcode modal
   (`src/app/scan.tsx`, expo-camera `CameraView`); `src/services/usda.ts` (`searchFoods`) backs the
@@ -63,7 +69,8 @@ Documentation surface to reconcile:
   `.github/workflows/*`), symbol names (`getIngredient` / `resolveEntryNutrients` /
   `recipePerServing` / `fetchProduct` / `searchFoods` / `offProductToIngredient` /
   `usdaFoodToIngredient` / `setUsdaApiKey` / `resetData`), persisted store keys (`hasOnboarded`,
-  `userIngredients`, `recipes`, `log`, `goals`, `settings`), the persisted store name
+  `userIngredients`, `recipes`, `log`, `goals`, `settings`, `savedMeals`, `plan`, `weights`,
+  `notes`, `groceryChecked`), the persisted store name
   (`smriti-store-v1`), commands (`npx expo start`, `npx tsc --noEmit`, `npx expo lint`,
   `npm test`, `npx expo export -p ios`, `node scripts/build-seed.mjs`), and counts like the seed
   ingredient total (**currently 32**).
