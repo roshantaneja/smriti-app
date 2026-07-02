@@ -17,7 +17,8 @@ This project uses **standard `expo-router` `Tabs`** (not the template's `unstabl
  The USDA seed library is **not** persisted — it's combined with user ingredients at read time
  (`getIngredient`, plus the inline seed+user merge in the Foods/Recipe screens). Persisted keys:
  `hasOnboarded`, `userIngredients`, `recipes`, `log`, `goals`, `settings`, `savedMeals`, `plan`,
- `weights`, `notes`, `groceryChecked`. The `settings` slice
+ `weights`, `notes`, `groceryChecked`, `goalOverrides`, `pinnedNutrients`, `pantry`, `menus`.
+ The `settings` slice
  (`Settings { usdaApiKey }`) is edited via `setUsdaApiKey`; `resetData` clears everything except
  `settings` + `hasOnboarded` and resets `goals`.
  New store fields are optional-with-defaults
@@ -28,8 +29,20 @@ This project uses **standard `expo-router` `Tabs`** (not the template's `unstabl
   nutrients **per 100 g**; household units (cup, egg…) are conversions in `src/lib/units.ts`.
 - **Meal planning:** `src/lib/grocery.ts` (pure, tested) owns week math (Monday-start), grocery
   aggregation from the weekly `plan` (leftover entries excluded), cost totals from ingredient
-  prices, and the `groceryChecked` key format (`${weekStart}:${ingredientId}`). Screens:
-  `(tabs)/plan.tsx` + `grocery.tsx`.
+  prices, pantry subtraction (`applyPantry` — an untracked pantry item drops the line, a tracked
+  one subtracts its grams + proportional cost, ≤0 dropped; `pantryCoverage` for the caption), and
+  the `groceryChecked` key format (`${weekStart}:${ingredientId}`). Screens: `(tabs)/plan.tsx` +
+  `grocery.tsx` — Plan saves the visible week as a reusable menu and re-applies menus to other
+  weeks (`saveMenu` / `applyMenu` / `deleteMenu`; `menus` holds `WeekMenu` templates with
+  `dayOffset`-relative entries); Grocery's per-line "have it" toggle and Pantry section edit the
+  `pantry` slice (`PantryItem { ingredientId, grams? }`, grams omitted = untracked) via
+  `setPantryItem` / `removePantryItem`.
+- **Goal scheduling:** `src/lib/goals.ts` (pure, tested: `weekdayOf`, `effectiveGoals`,
+  `hasOverride`) merges the per-weekday `goalOverrides` (`Partial<Goals>`, blank field = inherit
+  base) onto `goals`. Edited in `goals.tsx` ("Weekly schedule", Monday-first chips), which also
+  toggles `pinnedNutrients` (`togglePinnedNutrient`, one chip per MICROS entry). Today displays
+  the weekday's effective targets (with an "adjusted for {day}" hint) and pinned-nutrient
+  daily-total tiles.
 - **Logging accelerators:** the `log-add` modal has five modes (Foods / Recipes / Meals / Quick
   add / Water) with Recent/Frequent shortcut chips derived from the log (last-used portions);
   `savedMeals` templates are created from Today ("Save as meal…" on a meal section) and logged
@@ -83,9 +96,10 @@ Documentation surface to reconcile:
   `.github/workflows/*`), symbol names (`getIngredient` / `resolveEntryNutrients` /
   `recipePerServing` / `fetchProduct` / `searchFoods` / `offProductToIngredient` /
   `usdaFoodToIngredient` / `setUsdaApiKey` / `resetData` / `updateLogEntry` / `copyLogEntries` /
-  `logSavedMeal` / `weightTrend` / `logToCsv`), persisted store keys (`hasOnboarded`,
-  `userIngredients`, `recipes`, `log`, `goals`, `settings`, `savedMeals`, `plan`, `weights`,
-  `notes`, `groceryChecked`), the persisted store name
+  `logSavedMeal` / `weightTrend` / `logToCsv` / `effectiveGoals` / `applyPantry`), persisted
+  store keys (`hasOnboarded`, `userIngredients`, `recipes`, `log`, `goals`, `settings`,
+  `savedMeals`, `plan`, `weights`, `notes`, `groceryChecked`, `goalOverrides`,
+  `pinnedNutrients`, `pantry`, `menus`), the persisted store name
   (`smriti-store-v1`), commands (`npx expo start`, `npx tsc --noEmit`, `npx expo lint`,
   `npm test`, `npx expo export -p ios`, `node scripts/build-seed.mjs`), and counts like the seed
   ingredient total (**currently 32**).

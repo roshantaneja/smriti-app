@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Alert, Platform, Pressable, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
-import { Segmented } from '@/components/ui/segmented';
+import { Chip, Segmented } from '@/components/ui/segmented';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { dayKey, dayLabel } from '@/lib/date';
@@ -51,6 +51,54 @@ export default function PlanScreen() {
 
   const startKey = useMemo(() => addDays(weekStart(dayKey()), weekOffset * 7), [weekOffset]);
   const days = useMemo(() => weekDays(startKey), [startKey]);
+
+  const plan = useStore((s) => s.plan);
+  const menus = useStore((s) => s.menus);
+  const saveMenu = useStore((s) => s.saveMenu);
+  const applyMenu = useStore((s) => s.applyMenu);
+  const deleteMenu = useStore((s) => s.deleteMenu);
+  // Android fallback for the iOS-only Alert.prompt "Save week…" flow.
+  const [savingMenu, setSavingMenu] = useState(false);
+  const [menuName, setMenuName] = useState('');
+
+  const weekHasEntries = useMemo(() => {
+    const week = new Set(days);
+    return plan.some((p) => week.has(p.date));
+  }, [plan, days]);
+
+  const onSaveWeek = () => {
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        'Save week as menu',
+        'Name this week to re-apply the whole plan to any future week.',
+        (name) => {
+          const trimmed = name?.trim();
+          if (trimmed) saveMenu(trimmed, startKey);
+        },
+      );
+    } else {
+      setMenuName('');
+      setSavingMenu(true);
+    }
+  };
+
+  const onApplyMenu = (id: string, name: string) => {
+    if (weekHasEntries) {
+      Alert.alert('Apply menu', `This week already has entries — add “${name}” on top?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Apply', onPress: () => applyMenu(id, startKey) },
+      ]);
+    } else {
+      applyMenu(id, startKey);
+    }
+  };
+
+  const onDeleteMenu = (id: string, name: string) => {
+    Alert.alert('Delete menu', `Delete the saved menu “${name}”?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteMenu(id) },
+    ]);
+  };
 
   return (
     <Screen
@@ -101,6 +149,74 @@ export default function PlanScreen() {
           <Ionicons name="chevron-forward" size={18} color={theme.text} />
         </Pressable>
       </View>
+
+      {/* Reusable week menus: snapshot the visible week, re-apply saved ones. */}
+      {menus.length > 0 || weekHasEntries ? (
+        <View style={{ gap: Spacing.two }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {menus.length > 0 ? 'Menus — tap to apply to this week' : 'Menus'}
+            </ThemedText>
+            <Pressable
+              onPress={onSaveWeek}
+              disabled={!weekHasEntries}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Save this week as a menu">
+              <ThemedText
+                type="small"
+                style={{ color: theme.tint, fontWeight: '700', opacity: weekHasEntries ? 1 : 0.4 }}>
+                Save week…
+              </ThemedText>
+            </Pressable>
+          </View>
+          {menus.length > 0 ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.two }}>
+              {menus.map((m) => (
+                <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.one }}>
+                  <Chip label={m.name} onPress={() => onApplyMenu(m.id, m.name)} />
+                  <Pressable
+                    onPress={() => onDeleteMenu(m.id, m.name)}
+                    hitSlop={8}
+                    accessibilityLabel={`Delete menu ${m.name}`}>
+                    <Ionicons name="close" size={14} color={theme.textSecondary} />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {savingMenu ? (
+            <Card style={{ gap: Spacing.two }}>
+              <Field
+                label="Menu name"
+                placeholder="e.g. Usual training week"
+                value={menuName}
+                onChangeText={setMenuName}
+                autoFocus
+              />
+              <View style={{ flexDirection: 'row', gap: Spacing.two }}>
+                <Button
+                  title="Cancel"
+                  variant="secondary"
+                  size="sm"
+                  style={{ flex: 1 }}
+                  onPress={() => setSavingMenu(false)}
+                />
+                <Button
+                  title="Save menu"
+                  size="sm"
+                  style={{ flex: 1 }}
+                  disabled={!menuName.trim()}
+                  onPress={() => {
+                    saveMenu(menuName.trim(), startKey);
+                    setSavingMenu(false);
+                  }}
+                />
+              </View>
+            </Card>
+          ) : null}
+        </View>
+      ) : null}
 
       {days.map((date) => (
         <DaySection key={date} date={date} lastGramsRef={lastGramsRef} />

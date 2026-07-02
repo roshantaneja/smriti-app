@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
@@ -344,6 +344,14 @@ function MealsMode({ meal }: { meal: MealType }) {
   const getIngredient = useStore((s) => s.getIngredient);
   const getRecipe = useStore((s) => s.getRecipe);
   const logSavedMeal = useStore((s) => s.logSavedMeal);
+  const deleteSavedMeal = useStore((s) => s.deleteSavedMeal);
+
+  const confirmDelete = (id: string, name: string) => {
+    Alert.alert('Delete saved meal', `Delete “${name}”? Past log entries are unaffected.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteSavedMeal(id) },
+    ]);
+  };
 
   if (savedMeals.length === 0) {
     return (
@@ -397,6 +405,12 @@ function MealsMode({ meal }: { meal: MealType }) {
               </ThemedText>
             </View>
             <Ionicons name="add-circle-outline" size={22} color={theme.tint} />
+            <Pressable
+              onPress={() => confirmDelete(m.id, m.name)}
+              hitSlop={8}
+              accessibilityLabel={`Delete saved meal ${m.name}`}>
+              <Ionicons name="close" size={18} color={theme.textSecondary} />
+            </Pressable>
           </Pressable>
         );
       })}

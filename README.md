@@ -19,10 +19,12 @@ The core daily loop:
   keep a daily note; and a streak badge celebrates consecutive logging days.
 - **Fast logging** — the add sheet has Foods / Recipes / Meals / Quick add / Water modes, with
   Recent & Frequent one-tap shortcuts (remembering your last-used portions) and saved meal
-  templates ("Save as meal…" from Today) that log a whole meal in one tap.
+  templates ("Save as meal…" from Today) that log a whole meal in one tap — and can be
+  deleted from the sheet when outgrown.
 - **Foods** — an ingredient library seeded with real USDA nutrition data (per 100 g),
   plus your own foods (manual entry with optional price). Tap any food for full per-100 g
-  detail including micronutrients.
+  detail including micronutrients; your own foods can be edited or deleted from there
+  (the USDA seed stays read-only).
 - **Scan a barcode** — point the camera at a packaged food and Smriti imports its nutrition
   from Open Food Facts, prefilled into the new-ingredient form.
 - **Search online** — live text search of USDA FoodData Central (needs a free USDA API key,
@@ -34,12 +36,16 @@ The core daily loop:
   sort by protein density, speed, or rating; filter by tags, protein, or priced-only; scale
   the batch, duplicate a recipe, or send it straight to the weekly plan.
 - **Plan** — assign recipes/foods to the week's meals, see per-day macro totals, log a
-  planned meal in one tap, and generate a **grocery list** (ingredients aggregated across the
-  week, with estimated cost where ingredients carry prices).
+  planned meal in one tap, save a week as a reusable **menu** to apply to any other week, and
+  generate a **grocery list** (ingredients aggregated across the week, with estimated cost
+  where ingredients carry prices — mark items you already have and your pantry is subtracted
+  from the list).
 - **Trends** — 7/30/90-day daily averages vs. your goals, a calorie chart with goal line
   (daily bars for the past week, weekly buckets beyond), a month history calendar with
   tap-for-day summaries, and a weight log with a smoothed trend line.
-- **Goals** — set your daily targets or apply a preset (under Settings → Goals).
+- **Goals** — set your daily targets or apply a preset (under Settings → Goals), schedule
+  per-weekday overrides (e.g. higher carbs on training days — Today shows that day's adjusted
+  targets), and pin micronutrients to track as daily tiles on Today.
 
 Everything is stored **on-device** (no account, no cloud). Barcode scanning and online food
 search are the only two features that touch the network (Open Food Facts and USDA FoodData
@@ -104,7 +110,7 @@ src/
     grocery.tsx        # weekly grocery checklist generated from the plan
     recipe/            # recipe create + detail
     food/              # manual ingredient entry + ingredient detail
-  lib/                 # domain: types, nutrition math, grocery/week math, trends + CSV export, presets, units, import mappers, store (zustand)
+  lib/                 # domain: types, nutrition math, grocery/week math, goal scheduling, trends + CSV export, presets, units, import mappers, store (zustand)
   services/            # network clients: Open Food Facts + USDA FoodData Central
   components/          # UI kit (Card, Button, Field, Screen, progress, ring, …)
   constants/theme.ts   # palette + per-macro colors

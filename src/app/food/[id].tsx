@@ -1,14 +1,16 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { View } from 'react-native';
+import { useState } from 'react';
+import { Alert, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Field } from '@/components/ui/field';
 import { MacroColors, Spacing } from '@/constants/theme';
 import { MICROS } from '@/lib/nutrition';
 import { useStore } from '@/lib/store';
-import type { NutrientKey } from '@/lib/types';
+import type { Ingredient, NutrientKey, Nutrients } from '@/lib/types';
 
 const MACROS: { key: NutrientKey; label: string; unit: string; color: string }[] = [
   { key: 'calories', label: 'kcal', unit: '', color: MacroColors.calories },
@@ -18,10 +20,22 @@ const MACROS: { key: NutrientKey; label: string; unit: string; color: string }[]
   { key: 'fiber', label: 'fiber', unit: 'g', color: MacroColors.fiber },
 ];
 
+/** Field labels for the user-ingredient editor (same set food/new.tsx edits). */
+const EDIT_MACROS: { key: NutrientKey; label: string; unit: string }[] = [
+  { key: 'calories', label: 'Calories', unit: 'kcal' },
+  { key: 'protein', label: 'Protein', unit: 'g' },
+  { key: 'carbs', label: 'Carbs', unit: 'g' },
+  { key: 'fat', label: 'Fat', unit: 'g' },
+  { key: 'fiber', label: 'Fiber', unit: 'g' },
+];
+
 export default function IngredientDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const getIngredient = useStore((s) => s.getIngredient);
+  const userIngredients = useStore((s) => s.userIngredients);
   const ing = getIngredient(id);
+  // Seed ingredients stay read-only; only the user's own foods are editable.
+  const isUserIngredient = userIngredients.some((i) => i.id === id);
 
   if (!ing) {
     return (
@@ -113,6 +127,131 @@ export default function IngredientDetailScreen() {
       </ThemedText>
 
       <Button title="Add to today" variant="secondary" onPress={() => router.push('/log-add')} style={{ marginTop: Spacing.two }} />
+
+      {isUserIngredient ? <EditorSection ing={ing} /> : null}
     </Screen>
+  );
+}
+
+/** Edit/delete for the user's own ingredients (never rendered for seed foods). */
+function EditorSection({ ing }: { ing: Ingredient }) {
+  const updateIngredient = useStore((s) => s.updateIngredient);
+  const deleteIngredient = useStore((s) => s.deleteIngredient);
+
+  const [name, setName] = useState(ing.name);
+  const [category, setCategory] = useState(ing.category);
+  const [vals, setVals] = useState<Record<string, string>>(() => {
+    const out: Record<string, string> = {};
+    for (const m of EDIT_MACROS) {
+      const v = ing.per100g[m.key];
+      if (typeof v === 'number') out[m.key] = String(v);
+    }
+    return out;
+  });
+  const [portionUnit, setPortionUnit] = useState(ing.portions[0]?.unit ?? '');
+  const [portionGrams, setPortionGrams] = useState(
+    ing.portions[0] ? String(ing.portions[0].grams) : '',
+  );
+  const [priceAmount, setPriceAmount] = useState(ing.price ? String(ing.price.amount) : '');
+  const [priceGrams, setPriceGrams] = useState(ing.price ? String(ing.price.grams) : '');
+
+  const setVal = (k: string, t: string) => setVals((v) => ({ ...v, [k]: t.replace(/[^0-9.]/g, '') }));
+  const canSave = name.trim().length > 0;
+
+  const onSave = () => {
+    if (!canSave) return;
+    // Keep any micronutrients the form doesn't surface; the visible macro
+    // fields win so hand edits always take effect (same as food/new.tsx).
+    const per100g: Nutrients = { ...ing.per100g };
+    for (const m of EDIT_MACROS) {
+      const v = Number(vals[m.key]) || 0;
+      if (v > 0) per100g[m.key] = v;
+      else delete per100g[m.key];
+    }
+    const portions =
+      portionUnit.trim() && Number(portionGrams) > 0
+        ? [{ unit: portionUnit.trim(), grams: Number(portionGrams) }]
+        : [];
+    const price =
+      Number(priceAmount) > 0 && Number(priceGrams) > 0
+        ? { amount: Number(priceAmount), grams: Number(priceGrams) }
+        : undefined;
+    updateIngredient(ing.id, {
+      name: name.trim(),
+      category: category.trim() || 'Custom',
+      per100g,
+      portions,
+      price,
+    });
+  };
+
+  const onDelete = () => {
+    Alert.alert(
+      'Delete ingredient',
+      `Delete “${ing.name}”? Recipes, plans, and pantry entries that use it will show it as missing.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            deleteIngredient(ing.id);
+            router.back();
+          },
+        },
+      ],
+    );
+  };
+
+  return (
+    <View style={{ gap: Spacing.three, marginTop: Spacing.two }}>
+      <ThemedText type="smallBold">Edit ingredient</ThemedText>
+      <Card style={{ gap: Spacing.three }}>
+        <Field label="Name" value={name} onChangeText={setName} />
+        <Field label="Category" placeholder="Custom" value={category} onChangeText={setCategory} />
+        {EDIT_MACROS.map((m) => (
+          <Field
+            key={m.key}
+            label={`${m.label} (per 100 g)`}
+            suffix={m.unit}
+            keyboardType="decimal-pad"
+            placeholder="0"
+            value={vals[m.key] ?? ''}
+            onChangeText={(t) => setVal(m.key, t)}
+          />
+        ))}
+        <View style={{ flexDirection: 'row', gap: Spacing.three }}>
+          <Field label="Portion unit" placeholder="cup" value={portionUnit} onChangeText={setPortionUnit} />
+          <Field
+            label="Grams"
+            suffix="g"
+            keyboardType="decimal-pad"
+            placeholder="0"
+            value={portionGrams}
+            onChangeText={(t) => setPortionGrams(t.replace(/[^0-9.]/g, ''))}
+          />
+        </View>
+        <View style={{ flexDirection: 'row', gap: Spacing.three }}>
+          <Field
+            label="Price"
+            suffix="$"
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+            value={priceAmount}
+            onChangeText={(t) => setPriceAmount(t.replace(/[^0-9.]/g, ''))}
+          />
+          <Field
+            label="For"
+            suffix="g"
+            keyboardType="decimal-pad"
+            placeholder="0"
+            value={priceGrams}
+            onChangeText={(t) => setPriceGrams(t.replace(/[^0-9.]/g, ''))}
+          />
+        </View>
+        <Button title="Save changes" onPress={onSave} disabled={!canSave} />
+      </Card>
+      <Button title="Delete ingredient" variant="danger" onPress={onDelete} />
+    </View>
   );
 }

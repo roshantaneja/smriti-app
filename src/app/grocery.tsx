@@ -14,8 +14,10 @@ import { dayKey } from '@/lib/date';
 import {
   addDays,
   aggregateGroceries,
+  applyPantry,
   formatGrams,
   groceryTotals,
+  pantryCoverage,
   weekStart,
   type GroceryLine,
 } from '@/lib/grocery';
@@ -41,12 +43,16 @@ export default function GroceryScreen() {
   const groceryChecked = useStore((s) => s.groceryChecked);
   const toggleGroceryChecked = useStore((s) => s.toggleGroceryChecked);
   const clearGroceryChecked = useStore((s) => s.clearGroceryChecked);
+  const pantry = useStore((s) => s.pantry);
+  const setPantryItem = useStore((s) => s.setPantryItem);
 
   const startKey = useMemo(() => addDays(weekStart(dayKey()), weekOffset * 7), [weekOffset]);
-  const lines = useMemo(
+  const allLines = useMemo(
     () => aggregateGroceries(plan, startKey, getIngredient, getRecipe),
     [plan, startKey, getIngredient, getRecipe],
   );
+  const lines = useMemo(() => applyPantry(allLines, pantry), [allLines, pantry]);
+  const coverage = useMemo(() => pantryCoverage(allLines, pantry), [allLines, pantry]);
   const totals = useMemo(() => groceryTotals(lines), [lines]);
   const checkedCount = lines.filter((l) => groceryChecked[l.key]).length;
 
@@ -81,12 +87,29 @@ export default function GroceryScreen() {
         </Pressable>
       </View>
 
+      {coverage.covered + coverage.reduced > 0 ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.one, justifyContent: 'center' }}>
+          <Ionicons name="basket-outline" size={14} color={theme.tint} />
+          <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 12 }}>
+            {coverage.covered > 0
+              ? `${coverage.covered} item${coverage.covered === 1 ? '' : 's'} covered by your pantry`
+              : ''}
+            {coverage.covered > 0 && coverage.reduced > 0 ? ' · ' : ''}
+            {coverage.reduced > 0 ? `${coverage.reduced} reduced` : ''}
+          </ThemedText>
+        </View>
+      ) : null}
+
       {lines.length === 0 ? (
         <Card>
           <EmptyState
             icon="cart-outline"
             title="Nothing to buy"
-            message="Plan some meals for this week and the shopping list builds itself."
+            message={
+              coverage.covered > 0
+                ? 'Your pantry already covers everything this week needs.'
+                : 'Plan some meals for this week and the shopping list builds itself.'
+            }
           />
           <Button title="Go to plan" onPress={() => router.back()} />
         </Card>
@@ -139,6 +162,13 @@ export default function GroceryScreen() {
                           ${l.estCost.toFixed(2)}
                         </ThemedText>
                       ) : null}
+                      <Pressable
+                        onPress={() => setPantryItem(l.ingredientId)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Already have ${l.name} — move to pantry`}>
+                        <Ionicons name="basket-outline" size={20} color={theme.textSecondary} />
+                      </Pressable>
                     </Pressable>
                   );
                 })}
@@ -169,6 +199,58 @@ export default function GroceryScreen() {
           </Card>
         </>
       )}
+
+      {pantry.length > 0 ? <PantrySection /> : null}
     </Screen>
+  );
+}
+
+/** What's already at home — collapsible; each item removable with ✕. */
+function PantrySection() {
+  const theme = useTheme();
+  const pantry = useStore((s) => s.pantry);
+  const getIngredient = useStore((s) => s.getIngredient);
+  const removePantryItem = useStore((s) => s.removePantryItem);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Card style={{ gap: Spacing.two }}>
+      <Pressable
+        onPress={() => setOpen((o) => !o)}
+        accessibilityRole="button"
+        accessibilityLabel={open ? 'Collapse pantry' : 'Expand pantry'}
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.one }}>
+          <Ionicons name="basket-outline" size={16} color={theme.tint} />
+          <ThemedText type="smallBold">
+            Pantry · {pantry.length} item{pantry.length === 1 ? '' : 's'}
+          </ThemedText>
+        </View>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={theme.textSecondary} />
+      </Pressable>
+      {open
+        ? pantry.map((p) => {
+            const name = getIngredient(p.ingredientId)?.name ?? 'Unknown ingredient';
+            return (
+              <View
+                key={p.ingredientId}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
+                <ThemedText type="small" style={{ flex: 1 }}>
+                  {name}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {p.grams != null ? formatGrams(p.grams) : 'have some'}
+                </ThemedText>
+                <Pressable
+                  onPress={() => removePantryItem(p.ingredientId)}
+                  hitSlop={8}
+                  accessibilityLabel={`Remove ${name} from pantry`}>
+                  <Ionicons name="close" size={18} color={theme.textSecondary} />
+                </Pressable>
+              </View>
+            );
+          })
+        : null}
+    </Card>
   );
 }

@@ -9,12 +9,15 @@ import { describe, expect, it } from '@jest/globals';
 import {
   addDays,
   aggregateGroceries,
+  applyPantry,
   formatGrams,
   groceryKey,
   groceryTotals,
+  pantryCoverage,
   planDayNutrients,
   weekDays,
   weekStart,
+  type GroceryLine,
 } from '../grocery';
 import type { Ingredient, PlanEntry, Recipe } from '../types';
 
@@ -260,6 +263,105 @@ describe('groceryTotals', () => {
 
   it('handles an empty list', () => {
     expect(groceryTotals([])).toEqual({ totalCost: 0, pricedLines: 0, totalLines: 0 });
+  });
+});
+
+// A priced/unpriced pair of lines for the pantry-subtraction tests.
+const groceryLine = (over: Partial<GroceryLine> = {}): GroceryLine => ({
+  key: '2026-06-29:chicken',
+  ingredientId: 'chicken',
+  name: 'Chicken breast',
+  category: 'Meat',
+  totalGrams: 700,
+  estCost: 5.6,
+  ...over,
+});
+
+describe('applyPantry', () => {
+  it('is the identity for an empty pantry', () => {
+    const lines = [groceryLine()];
+    expect(applyPantry(lines, [])).toBe(lines);
+  });
+
+  it('drops a line covered by an untracked pantry item ("have some")', () => {
+    expect(applyPantry([groceryLine()], [{ ingredientId: 'chicken' }])).toEqual([]);
+  });
+
+  it('subtracts tracked grams and rescales the cost proportionally', () => {
+    const out = applyPantry([groceryLine()], [{ ingredientId: 'chicken', grams: 200 }]);
+    expect(out).toEqual([groceryLine({ totalGrams: 500, estCost: 4 })]); // 500/700 * 5.6
+  });
+
+  it('leaves estCost undefined on unpriced lines after subtraction', () => {
+    const basilLine = groceryLine({
+      key: '2026-06-29:basil',
+      ingredientId: 'basil',
+      name: 'Basil',
+      category: 'Produce',
+      totalGrams: 50,
+      estCost: undefined,
+    });
+    const out = applyPantry([basilLine], [{ ingredientId: 'basil', grams: 20 }]);
+    expect(out[0]?.totalGrams).toBe(30);
+    expect(out[0]?.estCost).toBeUndefined();
+  });
+
+  it('drops lines the tracked amount reduces to zero or below', () => {
+    expect(applyPantry([groceryLine()], [{ ingredientId: 'chicken', grams: 700 }])).toEqual([]);
+    expect(applyPantry([groceryLine()], [{ ingredientId: 'chicken', grams: 800 }])).toEqual([]);
+  });
+
+  it('ignores pantry items that match no line', () => {
+    const lines = [groceryLine()];
+    expect(applyPantry(lines, [{ ingredientId: 'rice', grams: 500 }])).toEqual(lines);
+  });
+
+  it('rounds remaining grams to one decimal like aggregation does', () => {
+    const out = applyPantry(
+      [groceryLine({ totalGrams: 100.25, estCost: undefined })],
+      [{ ingredientId: 'chicken', grams: 50 }],
+    );
+    expect(out[0]?.totalGrams).toBe(50.3);
+  });
+});
+
+describe('pantryCoverage', () => {
+  const lines = [
+    groceryLine(), // chicken 700 g
+    groceryLine({
+      key: '2026-06-29:rice',
+      ingredientId: 'rice',
+      name: 'Rice',
+      category: 'Grains',
+      totalGrams: 300,
+      estCost: 1.2,
+    }),
+    groceryLine({
+      key: '2026-06-29:basil',
+      ingredientId: 'basil',
+      name: 'Basil',
+      category: 'Produce',
+      totalGrams: 50,
+      estCost: undefined,
+    }),
+  ];
+
+  it('counts fully covered and partially reduced lines', () => {
+    expect(
+      pantryCoverage(lines, [
+        { ingredientId: 'chicken' }, // untracked -> covered
+        { ingredientId: 'rice', grams: 300 }, // tracked >= needed -> covered
+        { ingredientId: 'basil', grams: 20 }, // tracked < needed -> reduced
+      ]),
+    ).toEqual({ covered: 2, reduced: 1 });
+  });
+
+  it('counts nothing for an empty pantry or non-matching items', () => {
+    expect(pantryCoverage(lines, [])).toEqual({ covered: 0, reduced: 0 });
+    expect(pantryCoverage(lines, [{ ingredientId: 'butter', grams: 100 }])).toEqual({
+      covered: 0,
+      reduced: 0,
+    });
   });
 });
 
