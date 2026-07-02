@@ -9,6 +9,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 import { uid } from "./id";
+import { addDays, weekDays, weekStart } from "./grocery";
 import { computeEntryNutrients, scaleNutrientsBy } from "./nutrition";
 import { SEED_INGREDIENTS } from "./seed";
 import type {
@@ -16,11 +17,15 @@ import type {
   Ingredient,
   LogEntry,
   MealType,
+  NutrientKey,
+  PantryItem,
   PlanEntry,
   Recipe,
   SavedMeal,
   SavedMealItem,
   Settings,
+  Weekday,
+  WeekMenu,
   WeightEntry,
 } from "./types";
 import { dayKey } from "./date";
@@ -56,6 +61,14 @@ interface AppState {
   notes: Record<string, string>;
   /** Grocery checklist state; keys are defined by src/lib/grocery.ts. */
   groceryChecked: Record<string, boolean>;
+  /** Per-weekday goal overrides (calorie cycling / training days). */
+  goalOverrides: Partial<Record<Weekday, Partial<Goals>>>;
+  /** Extra nutrients pinned as dashboard tiles on Today. */
+  pinnedNutrients: NutrientKey[];
+  /** Ingredients already at home — subtracted from grocery lists. */
+  pantry: PantryItem[];
+  /** Reusable week templates for the planner. */
+  menus: WeekMenu[];
 
   // Derived lookups (seed first, then user).
   getIngredient: (id: string) => Ingredient | undefined;
@@ -108,6 +121,21 @@ interface AppState {
 
   duplicateRecipe: (id: string) => Recipe | undefined;
 
+  /** Set (patch) or clear (null) one weekday's goal override. */
+  setGoalOverride: (day: Weekday, patch: Partial<Goals> | null) => void;
+  togglePinnedNutrient: (key: NutrientKey) => void;
+
+  // Pantry (upsert by ingredientId)
+  setPantryItem: (ingredientId: string, grams?: number) => void;
+  removePantryItem: (ingredientId: string) => void;
+
+  // Reusable week menus
+  /** Snapshot the given week's plan as a named template. Null if week empty. */
+  saveMenu: (name: string, weekStartKey: string) => WeekMenu | null;
+  /** Materialize a template onto a week as plan entries. */
+  applyMenu: (id: string, weekStartKey: string) => void;
+  deleteMenu: (id: string) => void;
+
   setGoals: (patch: Partial<Goals>) => void;
   /** Replace all goals at once (used when applying a preset). */
   setPreset: (goals: Goals) => void;
@@ -134,6 +162,10 @@ export const useStore = create<AppState>()(
       weights: [],
       notes: {},
       groceryChecked: {},
+      goalOverrides: {},
+      pinnedNutrients: [],
+      pantry: [],
+      menus: [],
 
       getIngredient: (id) =>
         SEED_INGREDIENTS.find((i) => i.id === id) ??
@@ -310,6 +342,62 @@ export const useStore = create<AppState>()(
         return copy;
       },
 
+      setGoalOverride: (day, patch) =>
+        set((s) => {
+          const goalOverrides = { ...s.goalOverrides };
+          if (patch && Object.keys(patch).length > 0) goalOverrides[day] = patch;
+          else delete goalOverrides[day];
+          return { goalOverrides };
+        }),
+      togglePinnedNutrient: (key) =>
+        set((s) => ({
+          pinnedNutrients: s.pinnedNutrients.includes(key)
+            ? s.pinnedNutrients.filter((k) => k !== key)
+            : [...s.pinnedNutrients, key],
+        })),
+
+      setPantryItem: (ingredientId, grams) =>
+        set((s) => {
+          const existing = s.pantry.find((p) => p.ingredientId === ingredientId);
+          const item: PantryItem = { ingredientId, ...(grams != null && grams > 0 ? { grams } : {}) };
+          return {
+            pantry: existing
+              ? s.pantry.map((p) => (p.ingredientId === ingredientId ? item : p))
+              : [...s.pantry, item],
+          };
+        }),
+      removePantryItem: (ingredientId) =>
+        set((s) => ({ pantry: s.pantry.filter((p) => p.ingredientId !== ingredientId) })),
+
+      saveMenu: (name, weekStartKey) => {
+        const start = weekStart(weekStartKey);
+        const days = weekDays(start);
+        const entries = get()
+          .plan.filter((p) => days.includes(p.date))
+          .map(({ id: _id, date, ...rest }) => ({ ...rest, dayOffset: days.indexOf(date) }));
+        if (entries.length === 0) return null;
+        const menu: WeekMenu = {
+          id: uid("menu-"),
+          name,
+          entries,
+          createdAt: new Date().toISOString(),
+        };
+        set((s) => ({ menus: [...s.menus, menu] }));
+        return menu;
+      },
+      applyMenu: (id, weekStartKey) => {
+        const menu = get().menus.find((m) => m.id === id);
+        if (!menu) return;
+        const start = weekStart(weekStartKey);
+        const added: PlanEntry[] = menu.entries.map(({ dayOffset, ...rest }) => ({
+          ...rest,
+          id: uid("plan-"),
+          date: addDays(start, dayOffset),
+        }));
+        set((s) => ({ plan: [...s.plan, ...added] }));
+      },
+      deleteMenu: (id) => set((s) => ({ menus: s.menus.filter((m) => m.id !== id) })),
+
       setGoals: (patch) => set((s) => ({ goals: { ...s.goals, ...patch } })),
       setPreset: (goals) => set(() => ({ goals })),
       setHasOnboarded: (value) => set(() => ({ hasOnboarded: value })),
@@ -327,6 +415,10 @@ export const useStore = create<AppState>()(
           weights: [],
           notes: {},
           groceryChecked: {},
+          goalOverrides: {},
+          pinnedNutrients: [],
+          pantry: [],
+          menus: [],
         })),
     }),
     {
@@ -344,6 +436,10 @@ export const useStore = create<AppState>()(
         weights: s.weights,
         notes: s.notes,
         groceryChecked: s.groceryChecked,
+        goalOverrides: s.goalOverrides,
+        pinnedNutrients: s.pinnedNutrients,
+        pantry: s.pantry,
+        menus: s.menus,
       }),
       onRehydrateStorage: () => () => {
         // Runs after persisted state is merged back in.

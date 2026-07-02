@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
@@ -9,20 +9,22 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty';
 import { Field } from '@/components/ui/field';
-import { Segmented } from '@/components/ui/segmented';
+import { Chip, Segmented } from '@/components/ui/segmented';
 import { MacroColors, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { dayKey } from '@/lib/date';
-import { recipePerServing, scale } from '@/lib/nutrition';
+import { trimNum } from '@/lib/format';
+import { recipePerServing, scale, scaleNutrientsBy, sum } from '@/lib/nutrition';
 import { SEED_INGREDIENTS } from '@/lib/seed';
 import { useStore } from '@/lib/store';
-import type { Ingredient, MealType, NutrientKey } from '@/lib/types';
+import type { Ingredient, MealType, NutrientKey, Recipe } from '@/lib/types';
 import { defaultUnit, toGrams, unitOptions } from '@/lib/units';
 
-type Mode = 'foods' | 'recipes' | 'quick' | 'water';
+type Mode = 'foods' | 'recipes' | 'meals' | 'quick' | 'water';
 const MODES: { value: Mode; label: string }[] = [
   { value: 'foods', label: 'Foods' },
   { value: 'recipes', label: 'Recipes' },
+  { value: 'meals', label: 'Meals' },
   { value: 'quick', label: 'Quick add' },
   { value: 'water', label: 'Water' },
 ];
@@ -51,9 +53,72 @@ export default function LogAddScreen() {
       ) : null}
       {mode === 'foods' && <FoodsMode meal={meal} />}
       {mode === 'recipes' && <RecipesMode meal={meal} />}
+      {mode === 'meals' && <MealsMode meal={meal} />}
       {mode === 'quick' && <QuickMode meal={meal} />}
       {mode === 'water' && <WaterMode />}
     </Screen>
+  );
+}
+
+/** One shortcut target derived from the log: last-used portion + how often it was logged. */
+type Shortcut = { id: string; count: number; lastAt: string; lastGrams?: number; lastServings?: number };
+
+/**
+ * Recent (latest first) and frequent (2+ logs, most first) shortcut targets for
+ * one entry kind, derived from the persisted log — nothing new is stored.
+ */
+function useLogShortcuts(kind: 'ingredient' | 'recipe') {
+  const log = useStore((s) => s.log);
+  return useMemo(() => {
+    const byId = new Map<string, Shortcut>();
+    for (const e of log) {
+      if (e.kind !== kind) continue;
+      const id = kind === 'ingredient' ? e.ingredientId : e.recipeId;
+      if (!id) continue;
+      const cur = byId.get(id);
+      if (!cur) {
+        byId.set(id, { id, count: 1, lastAt: e.createdAt, lastGrams: e.grams, lastServings: e.servings });
+      } else {
+        cur.count += 1;
+        if (e.createdAt >= cur.lastAt) {
+          cur.lastAt = e.createdAt;
+          cur.lastGrams = e.grams;
+          cur.lastServings = e.servings;
+        }
+      }
+    }
+    const all = [...byId.values()];
+    const recent = [...all].sort((a, b) => b.lastAt.localeCompare(a.lastAt)).slice(0, 6);
+    const frequent = all
+      .filter((s) => s.count >= 2)
+      .sort((a, b) => b.count - a.count || b.lastAt.localeCompare(a.lastAt))
+      .slice(0, 6);
+    return { recent, frequent, byId };
+  }, [log, kind]);
+}
+
+/** Compact one-tap pills for the Recent / Frequent shortcut rows. */
+function ShortcutPills({
+  title,
+  items,
+  onPick,
+}: {
+  title: string;
+  items: { key: string; label: string }[];
+  onPick: (key: string) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <View style={{ gap: Spacing.one }}>
+      <ThemedText type="small" themeColor="textSecondary">
+        {title}
+      </ThemedText>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one }}>
+        {items.map((it) => (
+          <Chip key={it.key} label={it.label} onPress={() => onPick(it.key)} />
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -61,6 +126,7 @@ function FoodsMode({ meal }: { meal: MealType }) {
   const theme = useTheme();
   const userIngredients = useStore((s) => s.userIngredients);
   const addLogEntry = useStore((s) => s.addLogEntry);
+  const { recent, frequent, byId } = useLogShortcuts('ingredient');
 
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<Ingredient | null>(null);
@@ -82,6 +148,25 @@ function FoodsMode({ meal }: { meal: MealType }) {
     setUnit(u);
     setAmount(u === 'g' ? '100' : '1');
   };
+
+  // One tap on a shortcut picks the food with its last-used portion prefilled.
+  const pickShortcut = (id: string) => {
+    const ing = library.find((i) => i.id === id);
+    if (!ing) return;
+    const grams = byId.get(id)?.lastGrams;
+    setSelected(ing);
+    setUnit('g');
+    setAmount(trimNum(grams && grams > 0 ? grams : 100));
+  };
+
+  const foodChips = (items: Shortcut[]) =>
+    items
+      .map((s) => ({ s, ing: library.find((i) => i.id === s.id) }))
+      .filter((x): x is { s: Shortcut; ing: Ingredient } => x.ing != null)
+      .map(({ s, ing }) => ({
+        key: ing.id,
+        label: `${ing.name} · ${trimNum(s.lastGrams && s.lastGrams > 0 ? s.lastGrams : 100)} g`,
+      }));
 
   if (selected) {
     const grams = toGrams(selected, Number(amount) || 0, unit);
@@ -146,6 +231,12 @@ function FoodsMode({ meal }: { meal: MealType }) {
   return (
     <>
       <Field placeholder="Search foods…" value={q} onChangeText={setQ} autoCorrect={false} />
+      {!q.trim() ? (
+        <>
+          <ShortcutPills title="Recent" items={foodChips(recent)} onPick={pickShortcut} />
+          <ShortcutPills title="Frequent" items={foodChips(frequent)} onPick={pickShortcut} />
+        </>
+      ) : null}
       <Card style={{ padding: 0, overflow: 'hidden' }}>
         {list.map((ing, i) => (
           <Pressable
@@ -178,6 +269,24 @@ function RecipesMode({ meal }: { meal: MealType }) {
   const recipes = useStore((s) => s.recipes);
   const getIngredient = useStore((s) => s.getIngredient);
   const addLogEntry = useStore((s) => s.addLogEntry);
+  const { recent, frequent, byId } = useLogShortcuts('recipe');
+
+  // One tap on a shortcut logs the recipe with its last-used servings.
+  const logShortcut = (id: string) => {
+    const s = byId.get(id);
+    const servings = s?.lastServings && s.lastServings > 0 ? s.lastServings : 1;
+    addLogEntry({ date: dayKey(), kind: 'recipe', meal, recipeId: id, servings });
+    router.back();
+  };
+
+  const recipeChips = (items: Shortcut[]) =>
+    items
+      .map((s) => ({ s, recipe: recipes.find((r) => r.id === s.id) }))
+      .filter((x): x is { s: Shortcut; recipe: Recipe } => x.recipe != null)
+      .map(({ s, recipe }) => ({
+        key: recipe.id,
+        label: `${recipe.name} · ${trimNum(s.lastServings && s.lastServings > 0 ? s.lastServings : 1)}×`,
+      }));
 
   if (recipes.length === 0) {
     return (
@@ -189,12 +298,97 @@ function RecipesMode({ meal }: { meal: MealType }) {
   }
 
   return (
+    <>
+      <ShortcutPills title="Recent" items={recipeChips(recent)} onPick={logShortcut} />
+      <ShortcutPills title="Frequent" items={recipeChips(frequent)} onPick={logShortcut} />
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        {recipes.map((r, i) => {
+          const per = recipePerServing(r, getIngredient);
+          return (
+            <View
+              key={r.id}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: Spacing.three,
+                padding: Spacing.three,
+                borderTopWidth: i === 0 ? 0 : 1,
+                borderTopColor: theme.border,
+              }}>
+              <Pressable style={{ flex: 1 }} onPress={() => router.push(`/recipe/${r.id}`)}>
+                <ThemedText type="smallBold">{r.name}</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {Math.round(per.calories ?? 0)} kcal · {Math.round(per.protein ?? 0)}g protein / serving
+                </ThemedText>
+              </Pressable>
+              <Button
+                title="Log 1×"
+                size="sm"
+                variant="secondary"
+                onPress={() => {
+                  addLogEntry({ date: dayKey(), kind: 'recipe', meal, recipeId: r.id, servings: 1 });
+                  router.back();
+                }}
+              />
+            </View>
+          );
+        })}
+      </Card>
+    </>
+  );
+}
+
+function MealsMode({ meal }: { meal: MealType }) {
+  const theme = useTheme();
+  const savedMeals = useStore((s) => s.savedMeals);
+  const getIngredient = useStore((s) => s.getIngredient);
+  const getRecipe = useStore((s) => s.getRecipe);
+  const logSavedMeal = useStore((s) => s.logSavedMeal);
+  const deleteSavedMeal = useStore((s) => s.deleteSavedMeal);
+
+  const confirmDelete = (id: string, name: string) => {
+    Alert.alert('Delete saved meal', `Delete “${name}”? Past log entries are unaffected.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteSavedMeal(id) },
+    ]);
+  };
+
+  if (savedMeals.length === 0) {
+    return (
+      <Card>
+        <EmptyState
+          icon="bookmark-outline"
+          title="No saved meals yet"
+          message="Log some foods on Today, then tap “Save as meal…” on a meal section to reuse the whole set here in one tap."
+        />
+      </Card>
+    );
+  }
+
+  return (
     <Card style={{ padding: 0, overflow: 'hidden' }}>
-      {recipes.map((r, i) => {
-        const per = recipePerServing(r, getIngredient);
+      {savedMeals.map((m, i) => {
+        // Template totals: ingredient/recipe items computed live, quick items as stored.
+        const n = sum(
+          m.items.map((it) => {
+            if (it.kind === 'ingredient') {
+              const ing = it.ingredientId ? getIngredient(it.ingredientId) : undefined;
+              return ing ? scale(ing.per100g, it.grams ?? 0) : {};
+            }
+            if (it.kind === 'recipe') {
+              const r = it.recipeId ? getRecipe(it.recipeId) : undefined;
+              return r ? scaleNutrientsBy(recipePerServing(r, getIngredient), it.servings ?? 1) : {};
+            }
+            return it.nutrients ?? {};
+          }),
+        );
         return (
-          <View
-            key={r.id}
+          <Pressable
+            key={m.id}
+            onPress={() => {
+              logSavedMeal(m.id, dayKey(), meal);
+              router.back();
+            }}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -203,22 +397,21 @@ function RecipesMode({ meal }: { meal: MealType }) {
               borderTopWidth: i === 0 ? 0 : 1,
               borderTopColor: theme.border,
             }}>
-            <Pressable style={{ flex: 1 }} onPress={() => router.push(`/recipe/${r.id}`)}>
-              <ThemedText type="smallBold">{r.name}</ThemedText>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="smallBold">{m.name}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                {Math.round(per.calories ?? 0)} kcal · {Math.round(per.protein ?? 0)}g protein / serving
+                {m.items.length} item{m.items.length === 1 ? '' : 's'} · {Math.round(n.calories ?? 0)} kcal ·{' '}
+                {Math.round(n.protein ?? 0)}P · {Math.round(n.carbs ?? 0)}C · {Math.round(n.fat ?? 0)}F
               </ThemedText>
+            </View>
+            <Ionicons name="add-circle-outline" size={22} color={theme.tint} />
+            <Pressable
+              onPress={() => confirmDelete(m.id, m.name)}
+              hitSlop={8}
+              accessibilityLabel={`Delete saved meal ${m.name}`}>
+              <Ionicons name="close" size={18} color={theme.textSecondary} />
             </Pressable>
-            <Button
-              title="Log 1×"
-              size="sm"
-              variant="secondary"
-              onPress={() => {
-                addLogEntry({ date: dayKey(), kind: 'recipe', meal, recipeId: r.id, servings: 1 });
-                router.back();
-              }}
-            />
-          </View>
+          </Pressable>
         );
       })}
     </Card>

@@ -146,6 +146,36 @@ export interface PlanEntry {
   leftover?: boolean;
 }
 
+/** Weekday keys for per-day goal overrides (Monday-first, matching plan weeks). */
+export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+/** An ingredient you already have at home; grams omitted = "some, untracked". */
+export interface PantryItem {
+  ingredientId: string;
+  grams?: number;
+}
+
+/** One slot of a reusable week template, relative to the week's Monday. */
+export interface WeekMenuEntry {
+  /** 0 = Monday … 6 = Sunday. */
+  dayOffset: number;
+  meal: MealType;
+  kind: "recipe" | "ingredient";
+  recipeId?: string;
+  servings?: number;
+  ingredientId?: string;
+  grams?: number;
+  leftover?: boolean;
+}
+
+/** A saved week of planning, re-appliable to any future week. */
+export interface WeekMenu {
+  id: string;
+  name: string;
+  entries: WeekMenuEntry[];
+  createdAt: string;
+}
+
 /** A single weigh-in. Weight is stored in kilograms. */
 export interface WeightEntry {
   id: string;

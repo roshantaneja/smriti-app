@@ -14,23 +14,38 @@ The core daily loop:
 - **Onboarding** — first launch picks a goal preset (Balanced, High-protein, Keto, …) or skips.
 - **Today** — dashboard with macro rings for calories/protein/carbs/fat plus fiber and water
   bars vs. your goals; logged food grouped by Breakfast / Lunch / Dinner / Snacks with per-meal
-  subtotals; collapsible micronutrient totals; water logged separately.
+  subtotals; collapsible micronutrient totals; water logged separately. Tap an entry to edit its
+  portion, move it to another meal, or delete it; copy yesterday's meal into an empty section;
+  keep a daily note; and a streak badge celebrates consecutive logging days.
+- **Fast logging** — the add sheet has Foods / Recipes / Meals / Quick add / Water modes, with
+  Recent & Frequent one-tap shortcuts (remembering your last-used portions) and saved meal
+  templates ("Save as meal…" from Today) that log a whole meal in one tap — and can be
+  deleted from the sheet when outgrown.
 - **Foods** — an ingredient library seeded with real USDA nutrition data (per 100 g),
   plus your own foods (manual entry with optional price). Tap any food for full per-100 g
-  detail including micronutrients.
+  detail including micronutrients; your own foods can be edited or deleted from there
+  (the USDA seed stays read-only).
 - **Scan a barcode** — point the camera at a packaged food and Smriti imports its nutrition
   from Open Food Facts, prefilled into the new-ingredient form.
 - **Search online** — live text search of USDA FoodData Central (needs a free USDA API key,
   entered once in Settings); results also prefill the new-ingredient form.
-- **Settings** — USDA API key, plus a "reset all data" escape hatch.
+- **Settings** — goals link, USDA API key, CSV export (food log, day totals, weights — shared
+  via the system share sheet), plus a "reset all data" escape hatch.
 - **Recipes** — build a recipe from ingredients + amounts; it auto-computes per-serving
   macros and estimated cost when ingredients carry price data. Rate recipes after cooking;
   sort by protein density, speed, or rating; filter by tags, protein, or priced-only; scale
   the batch, duplicate a recipe, or send it straight to the weekly plan.
 - **Plan** — assign recipes/foods to the week's meals, see per-day macro totals, log a
-  planned meal in one tap, and generate a **grocery list** (ingredients aggregated across the
-  week, with estimated cost where ingredients carry prices).
-- **Goals** — set your daily targets or apply a preset (under Settings → Goals).
+  planned meal in one tap, save a week as a reusable **menu** to apply to any other week, and
+  generate a **grocery list** (ingredients aggregated across the week, with estimated cost
+  where ingredients carry prices — mark items you already have and your pantry is subtracted
+  from the list).
+- **Trends** — 7/30/90-day daily averages vs. your goals, a calorie chart with goal line
+  (daily bars for the past week, weekly buckets beyond), a month history calendar with
+  tap-for-day summaries, and a weight log with a smoothed trend line.
+- **Goals** — set your daily targets or apply a preset (under Settings → Goals), schedule
+  per-weekday overrides (e.g. higher carbs on training days — Today shows that day's adjusted
+  targets), and pin micronutrients to track as daily tiles on Today.
 
 Everything is stored **on-device** (no account, no cloud). Barcode scanning and online food
 search are the only two features that touch the network (Open Food Facts and USDA FoodData
@@ -87,15 +102,15 @@ src/
   app/                 # expo-router screens (file-based routing)
     (tabs)/            # Today · Plan · Recipes · Foods · Trends
     onboarding.tsx     # first-launch goal preset picker
-    log-add.tsx        # add-to-today modal (foods / recipes / quick / water + meal)
+    log-add.tsx        # add-to-today modal (foods / recipes / meals / quick / water + meal)
     scan.tsx           # barcode scanner modal (expo-camera -> Open Food Facts)
     food-search.tsx    # live USDA FoodData Central search modal
-    settings.tsx       # settings modal (goals link, USDA API key, reset data)
+    settings.tsx       # settings modal (goals link, USDA API key, CSV export, reset data)
     goals.tsx          # daily targets + presets (reached from Settings)
     grocery.tsx        # weekly grocery checklist generated from the plan
     recipe/            # recipe create + detail
     food/              # manual ingredient entry + ingredient detail
-  lib/                 # domain: types, nutrition math, grocery/week math, presets, units, import mappers, store (zustand)
+  lib/                 # domain: types, nutrition math, grocery/week math, goal scheduling, trends + CSV export, presets, units, import mappers, store (zustand)
   services/            # network clients: Open Food Facts + USDA FoodData Central
   components/          # UI kit (Card, Button, Field, Screen, progress, ring, …)
   constants/theme.ts   # palette + per-macro colors
@@ -105,9 +120,9 @@ scripts/build-seed.mjs # USDA -> seed-ingredients.json
 ## Roadmap (post-MVP)
 
 1. Nutrition-label scanning (OCR) — barcode scanning via Open Food Facts has shipped.
-2. Trends & analytics (charts, averages, history calendar, weight trend, CSV export) and
-   logging accelerators (recents/frequents, saved meals, copy day) — in progress; the Trends
-   tab is currently a placeholder. Meal planning + grocery lists have shipped.
-3. Restaurant/chain nutrition via a food API.
-4. Goal-aware AI recommendations that learn from your "didn't like it" feedback.
-5. Community recipe sharing.
+2. Restaurant/chain nutrition via a food API.
+3. Goal-aware AI recommendations that learn from your "didn't like it" feedback.
+4. Community recipe sharing.
+
+(Meal planning + grocery lists, trends & analytics, and the logging accelerators —
+recents/frequents, saved meals, copy day — have all shipped.)

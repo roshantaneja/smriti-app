@@ -7,7 +7,7 @@
 
 import { dayKey } from "./date";
 import { recipePerServing, scale, scaleNutrientsBy, sum } from "./nutrition";
-import type { Ingredient, Nutrients, PlanEntry, Recipe } from "./types";
+import type { Ingredient, Nutrients, PantryItem, PlanEntry, Recipe } from "./types";
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -105,6 +105,55 @@ export function aggregateGroceries(
   return lines.sort(
     (a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name),
   );
+}
+
+/**
+ * Subtract what's already at home from a grocery list. An untracked pantry
+ * item (`grams` omitted — "have some") covers its line entirely; a tracked one
+ * subtracts its grams, rescaling `estCost` proportionally on priced lines.
+ * Lines reduced to ≤ 0 g are dropped.
+ */
+export function applyPantry(lines: GroceryLine[], pantry: PantryItem[]): GroceryLine[] {
+  if (pantry.length === 0) return lines;
+  const byId = new Map(pantry.map((p) => [p.ingredientId, p]));
+  const out: GroceryLine[] = [];
+  for (const line of lines) {
+    const item = byId.get(line.ingredientId);
+    if (!item) {
+      out.push(line);
+      continue;
+    }
+    if (item.grams == null) continue; // untracked — you have it
+    const remaining = line.totalGrams - item.grams;
+    if (remaining <= 0) continue;
+    const estCost =
+      line.estCost != null && line.totalGrams > 0
+        ? round2((remaining / line.totalGrams) * line.estCost)
+        : line.estCost;
+    out.push({ ...line, totalGrams: Math.round(remaining * 10) / 10, estCost });
+  }
+  return out;
+}
+
+export interface PantryCoverage {
+  /** Lines the pantry removes entirely (untracked, or tracked ≥ needed). */
+  covered: number;
+  /** Lines the pantry shrinks but doesn't eliminate. */
+  reduced: number;
+}
+
+/** How much of a (pre-subtraction) grocery list the pantry accounts for. */
+export function pantryCoverage(lines: GroceryLine[], pantry: PantryItem[]): PantryCoverage {
+  const byId = new Map(pantry.map((p) => [p.ingredientId, p]));
+  let covered = 0;
+  let reduced = 0;
+  for (const line of lines) {
+    const item = byId.get(line.ingredientId);
+    if (!item) continue;
+    if (item.grams == null || item.grams >= line.totalGrams) covered += 1;
+    else reduced += 1;
+  }
+  return { covered, reduced };
 }
 
 export interface GroceryTotals {
