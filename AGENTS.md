@@ -29,7 +29,21 @@ This project uses **standard `expo-router` `Tabs`** (not the template's `unstabl
 - **Meal planning:** `src/lib/grocery.ts` (pure, tested) owns week math (Monday-start), grocery
   aggregation from the weekly `plan` (leftover entries excluded), cost totals from ingredient
   prices, and the `groceryChecked` key format (`${weekStart}:${ingredientId}`). Screens:
-  `(tabs)/plan.tsx` + `grocery.tsx`. The Trends tab is a placeholder (analytics wave deferred).
+  `(tabs)/plan.tsx` + `grocery.tsx`.
+- **Logging accelerators:** the `log-add` modal has five modes (Foods / Recipes / Meals / Quick
+  add / Water) with Recent/Frequent shortcut chips derived from the log (last-used portions);
+  `savedMeals` templates are created from Today ("Save as meal…" on a meal section) and logged
+  whole via `logSavedMeal`. Today rows expand into an inline editor — `updateLogEntry` rescales
+  the frozen nutrient snapshot linearly when grams/servings change — plus "Copy yesterday"
+  buttons (`copyLogEntries`), a ≥2-day streak badge, and a per-day note (`notes` via `setNote`).
+- **Analytics & export:** `src/lib/trends.ts` (pure, tested: `dayTotals`, `lastNDays`,
+  `rangeAverages`, `currentStreak`, `weightTrend` — EWMA, α = 0.3 — and `waterByDay`) backs the
+  Trends tab (`(tabs)/trends.tsx`): 7/30/90-day averages vs goals, a calorie bar chart (daily at
+  7 days, Monday-start weekly buckets beyond, with goal line), a month history calendar banded by
+  calories with tap-for-day summaries, and weight quick-add + trend chart. `src/lib/csv.ts`
+  (`logToCsv`, `dayTotalsToCsv`, `weightsToCsv`; RFC 4180 escaping) backs the Settings "Export"
+  section, which writes CSVs via the new expo-file-system API (`File`, `Paths`) and hands them to
+  the expo-sharing share sheet.
 - **External food import (the only two network features — everything else is offline):**
   `src/services/openFoodFacts.ts` (`fetchProduct`) backs the `scan` barcode modal
   (`src/app/scan.tsx`, expo-camera `CameraView`); `src/services/usda.ts` (`searchFoods`) backs the
@@ -68,7 +82,8 @@ Documentation surface to reconcile:
   `src/services/*`, `scripts/build-seed.mjs`, `jest.config.js`, `eas.json`,
   `.github/workflows/*`), symbol names (`getIngredient` / `resolveEntryNutrients` /
   `recipePerServing` / `fetchProduct` / `searchFoods` / `offProductToIngredient` /
-  `usdaFoodToIngredient` / `setUsdaApiKey` / `resetData`), persisted store keys (`hasOnboarded`,
+  `usdaFoodToIngredient` / `setUsdaApiKey` / `resetData` / `updateLogEntry` / `copyLogEntries` /
+  `logSavedMeal` / `weightTrend` / `logToCsv`), persisted store keys (`hasOnboarded`,
   `userIngredients`, `recipes`, `log`, `goals`, `settings`, `savedMeals`, `plan`, `weights`,
   `notes`, `groceryChecked`), the persisted store name
   (`smriti-store-v1`), commands (`npx expo start`, `npx tsc --noEmit`, `npx expo lint`,
