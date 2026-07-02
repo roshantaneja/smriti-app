@@ -16,10 +16,11 @@ import { MacroColors, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { dayKey, dayLabel } from '@/lib/date';
 import { entrySubtitle, entryTitle, trimNum } from '@/lib/format';
+import { effectiveGoals, hasOverride, weekdayOf } from '@/lib/goals';
 import { addDays } from '@/lib/grocery';
 import { MICROS, resolveEntryNutrients, totalForEntries, totalWater } from '@/lib/nutrition';
 import { useStore } from '@/lib/store';
-import type { LogEntry, MealType, SavedMealItem } from '@/lib/types';
+import type { LogEntry, MealType, SavedMealItem, Weekday } from '@/lib/types';
 
 const MEAL_ORDER: { meal: MealType; label: string }[] = [
   { meal: 'breakfast', label: 'Breakfast' },
@@ -34,6 +35,16 @@ const MEALS: { value: MealType; label: string }[] = [
   { value: 'dinner', label: 'Dinner' },
   { value: 'snack', label: 'Snacks' },
 ];
+
+const WEEKDAY_NAMES: Record<Weekday, string> = {
+  mon: 'Monday',
+  tue: 'Tuesday',
+  wed: 'Wednesday',
+  thu: 'Thursday',
+  fri: 'Friday',
+  sat: 'Saturday',
+  sun: 'Sunday',
+};
 
 /** Map one meal section's (non-water) entries to saved-meal template items. */
 function toSavedMealItems(items: LogEntry[]): SavedMealItem[] {
@@ -52,7 +63,9 @@ export default function TodayScreen() {
   const yesterday = addDays(today, -1);
 
   const log = useStore((s) => s.log);
-  const goals = useStore((s) => s.goals);
+  const baseGoals = useStore((s) => s.goals);
+  const goalOverrides = useStore((s) => s.goalOverrides);
+  const pinnedNutrients = useStore((s) => s.pinnedNutrients);
   const getIngredient = useStore((s) => s.getIngredient);
   const getRecipe = useStore((s) => s.getRecipe);
   const addWater = useStore((s) => s.addWater);
@@ -70,6 +83,13 @@ export default function TodayScreen() {
   const ctx = useMemo(() => ({ getIngredient, getRecipe }), [getIngredient, getRecipe]);
   const totals = useMemo(() => totalForEntries(entries, ctx), [entries, ctx]);
   const water = useMemo(() => totalWater(entries), [entries]);
+
+  // Today's displayed targets: base goals merged with this weekday's override.
+  const goals = useMemo(
+    () => effectiveGoals(baseGoals, goalOverrides, today),
+    [baseGoals, goalOverrides, today],
+  );
+  const goalsAdjusted = hasOverride(goalOverrides, today);
 
   const kcal = totals.calories ?? 0;
 
@@ -173,6 +193,11 @@ export default function TodayScreen() {
 
       {/* Macros */}
       <Card style={{ gap: Spacing.three }}>
+        {goalsAdjusted ? (
+          <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 12 }}>
+            Targets adjusted for {WEEKDAY_NAMES[weekdayOf(today)]}
+          </ThemedText>
+        ) : null}
         <View
           style={{
             flexDirection: 'row',
@@ -186,6 +211,32 @@ export default function TodayScreen() {
           <Ring label="Fat" value={totals.fat ?? 0} goal={goals.fat} unit="g" color={MacroColors.fat} size={64} />
         </View>
         <MacroProgress label="Fiber" value={totals.fiber ?? 0} goal={goals.fiber} unit="g" color={MacroColors.fiber} />
+        {pinnedNutrients.length > 0 ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
+            {pinnedNutrients.map((key) => {
+              const micro = MICROS.find((m) => m.key === key);
+              if (!micro) return null;
+              return (
+                <View
+                  key={key}
+                  style={{
+                    minWidth: 92,
+                    paddingVertical: Spacing.two,
+                    paddingHorizontal: Spacing.three,
+                    borderRadius: Radius.sm,
+                    backgroundColor: theme.backgroundSelected,
+                  }}>
+                  <ThemedText type="smallBold">
+                    {Math.round(totals[key] ?? 0)} {micro.unit}
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 12 }}>
+                    {micro.label}
+                  </ThemedText>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
       </Card>
 
       {/* Micronutrients (collapsible) */}
